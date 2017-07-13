@@ -1,3 +1,5 @@
+import os
+
 from twisted.internet import defer
 
 from ooni.templates import process
@@ -10,4 +12,5 @@ class TestP2PBittorrentTest(process.ProcessTest):
 
     @defer.inlineCallbacks
     def test_bittorent(self):
-        yield self.run(["/opt/transmission/run-test.sh"])
+        # Invoke the test script with environment variables in place.
+        yield self.run(["/opt/transmission/run-test.sh"], env=os.environ)
