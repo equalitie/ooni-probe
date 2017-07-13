@@ -9,6 +9,9 @@ import signal
 from twisted.scripts import twistd
 from twisted.python import usage
 
+ooni_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+sys.path.append(ooni_root)
+
 from ooni.utils import log, is_process_running
 from ooni.settings import config
 from ooni.agent.agent import AgentService

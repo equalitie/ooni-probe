@@ -4,6 +4,11 @@ from multiprocessing import Process
 
 from twisted.internet import task, defer
 
+import sys
+import os
+ooni_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+sys.path.append(ooni_root)
+
 def ooniprobe(reactor):
     from ooni.ui.cli import runWithDaemonDirector, runWithDirector
     from ooni.ui.cli import setupGlobalOptions, initializeOoniprobe

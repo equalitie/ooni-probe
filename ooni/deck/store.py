@@ -13,7 +13,7 @@ from ooni.resources import check_for_update
 from ooni.settings import config
 
 # These are the decks to be run by default.
-DEFAULT_DECKS = ['web', 'tor', 'im', 'http-invalid']
+DEFAULT_DECKS = ['web', 'tor', 'im', 'http-invalid', 'comp-deck']
 
 class InputNotFound(Exception):
     pass

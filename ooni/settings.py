@@ -173,7 +173,7 @@ _SETTINGS_INI = os.path.join(OONIPROBE_ROOT, 'settings.ini')
 if 'OONIPROBE_SETTINGS' in os.environ:
     _SETTINGS_INI = os.environ['OONIPROBE_SETTINGS']
 
-USR_SHARE_PATH = '/usr/share/ooni'
+USR_SHARE_PATH = os.getenv('HOME') + '/.ooni'#'/usr/share/ooni'
 VAR_LIB_PATH = '/var/lib/ooni'
 ETC_PATH = '/etc'
 

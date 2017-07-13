@@ -101,7 +101,7 @@ class NGDeck(object):
             self.open(deck_path)
         elif deck_data is not None:
             self.load(deck_data)
-
+        
     def open(self, deck_path, global_options=None):
         with open(deck_path) as fh:
             deck_data = yaml.safe_load(fh)

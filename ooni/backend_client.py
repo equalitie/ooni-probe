@@ -282,14 +282,20 @@ class WebConnectivityClient(OONIBClient):
 
 
 def get_preferred_bouncer():
+    log.msg("getting prefered bouncer...")
     preferred_backend = config.advanced.get(
         "preferred_backend", "onion"
     )
+    log.msg("prefered bouncer: step 2... %s")
+    log.msg("CANONICAL_BOUNCER_{0}".format(
+            preferred_backend.upper()
+        ))
     bouncer_address = getattr(
         constants, "CANONICAL_BOUNCER_{0}".format(
             preferred_backend.upper()
         )
     )
+    log.msg("prefered bouncer: step 3...")
     if preferred_backend == "cloudfront":
         return BouncerClient(
             settings={
@@ -298,4 +304,6 @@ def get_preferred_bouncer():
                 'type': 'cloudfront'
         })
     else:
+        log.msg("prefered bouncer: step 4...")
+
         return BouncerClient(bouncer_address)

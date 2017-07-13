@@ -328,6 +328,7 @@ def createDeck(global_options, url=None):
 
             test_options = subargs_to_options(args)
             test_options['test_name'] = test_name
+
             deck.load({
                 "tasks": [
                     {"ooni": test_options}
@@ -440,6 +441,11 @@ def runWithDirector(global_options, create_input_store=True):
         start_tor = False
     elif config.advanced.get("preferred_backend", "onion") == "onion":
         start_tor = True
+
+    if (not global_options['no-collector']) and (not (global_options['collector'])) and (config.reports.get('collector', None) is not None) :
+        log.msg("setting collector %s"%config.reports['collector'])
+        global_options['collector'] = config.reports['collector']
+        
 
     if (global_options['collector'] and
             config.advanced.get("preferred_backend", "onion") == "onion"):

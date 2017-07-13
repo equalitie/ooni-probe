@@ -1,0 +1,29 @@
+---
+header:
+  collector: 'https://oonib.asl19.org:11443/'
+name: Custom tests
+description: "a comprehensive decks for many tests"
+schedule: "* * * * *" #"@daily"
+icon: "fa-unlink"
+tasks:
+- name: helping peer to find peer and run a http
+  ooni:
+    test_name: peer_locator_test
+    http_port: 32768
+    backend: 5.196.75.194:57007
+    peer_list: ~/.ooni/inputs/data/peer_list.txt
+
+- name: checking connectivity to peer http server
+  ooni:
+    test_name: peer_http_reachable
+    file: ~/.ooni/inputs/data/peer_list.txt
+
+- name: checking if torrent downlaod is possible
+  ooni:
+    test_name: p2p_bittorrent_test
+
+- name: checking if http speed vs https
+  ooni:
+    test_name: http_vs_https
+    file: ~/.ooni/inputs/data/http_and_https_resources.txt
+

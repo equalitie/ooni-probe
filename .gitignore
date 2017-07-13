@@ -53,3 +53,9 @@ node_modules/
 # Travis secrets
 secrets/id_rsa_travis
 secrets/secrets.tar
+
+# Gnu Global
+GPATH
+GRTAGS
+GTAGS
+var/peer_list.txt
