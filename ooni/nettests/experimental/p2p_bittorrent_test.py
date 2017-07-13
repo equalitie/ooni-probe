@@ -11,6 +11,6 @@ class TestP2PBittorrentTest(process.ProcessTest):
     timeout = 1024
 
     @defer.inlineCallbacks
-    def test_bittorent(self):
+    def test_bittorrent(self):
         # Invoke the test script with environment variables in place.
         yield self.run(["/opt/transmission/run-test.sh"], env=os.environ)
