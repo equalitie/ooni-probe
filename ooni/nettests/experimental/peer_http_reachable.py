@@ -26,8 +26,12 @@ class PeerHttpReachable(httpt.HTTPTest):
         """
         self.localOptions['withoutbody'] = 1
         log.msg(str(self.input.split()))
-        self.ip, self.port = self.input.split(":")
-        self.http_url = "http://" + self.ip+":"+self.port + '/'
+        url = self.input
+        if '/' not in url:  # fix ``PUB_ADDR:PORT`` entries
+            url = url + '/'
+        if not url.beginswith('http://'):  # fix ``PUB_ADDR:PORT[/?QUERY_ARGS]`` entries
+            url = 'http://' + url
+        self.http_url = url
         self.report['http_success'] = False
 
     def test_http_speed(self):
