@@ -56,7 +56,7 @@ class PeerLocator(tcpt.TCPTest):
     so we can run web connectivity to them. 
     """
     name = "Peer Locator"
-    version = "0.1"
+    version = "0.2"
     authors = "vmon"
 
     usageOptions = UsageOptions
@@ -69,7 +69,7 @@ class PeerLocator(tcpt.TCPTest):
     
     def test_peer_locator(self):
         def got_response(response):
-            log.msg("received response %s from helper"%response)
+            log.msg("received response from helper: %s"%response)
             if response == '':
                 log.msg('no peer available at this moment')
                 self.report['status'] = 'no peer found'
@@ -128,8 +128,8 @@ class PeerLocator(tcpt.TCPTest):
                                 
         self.address, self.port = self.localOptions['backend'].split(":")
         self.port = int(self.port)
-        # HTTP server port and flags.
-        payload = str(http_server_port)
+        # HTTP server port, protocol and flags.
+        payload = '%s HTTP' % http_server_port
         payload += ' nat' if behind_nat else ' nonat'
         d = self.sendPayload(payload)
         d.addErrback(connection_failed)
