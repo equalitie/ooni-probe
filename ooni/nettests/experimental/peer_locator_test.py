@@ -13,6 +13,11 @@ import subprocess #running http server
 import time
 import urllib
 
+
+# Accept ``SECS.DEC IP:PORT PROTO[ FLAG]...`` from peer locator helper.
+_max_data_len = 100
+_data_re = re.compile(r'^[0-9]+\.[0-9]+ [\[\].:0-9a-f]+:[0-9]+ [A-Z]+( [_a-z]+)*$')
+
 # HTTP services which reply with the client's IP address in plain text.
 _ip_ident_services = [
     'https://ifconfig.co/',
@@ -69,10 +74,14 @@ class PeerLocator(tcpt.TCPTest):
     
     def test_peer_locator(self):
         def got_response(response):
+            response = response[:_max_data_len]
             log.msg("received response from helper: %s"%response)
             if response == '':
                 log.msg('no peer available at this moment')
                 self.report['status'] = 'no peer found'
+            elif not _data_re.match(response):
+                log.msg('invalid response')
+                self.report['status'] = 'invalid response'
             else:
                 self.report['status'] = ''
                 with open(self.localOptions['peer_list'], 'a+') as peer_list:
