@@ -64,5 +64,8 @@ def main():
         error("Someone else is already listening on " + str(listen_port),
               EXIT_BIND_FAILED)
 
+    # Exit successfully after server max age.
+    sys.exit(0)
+
 if __name__ == '__main__':
     main()
