@@ -6,16 +6,15 @@ from datetime import datetime, timedelta
 
 class PeerHttpReachable(httpt.HTTPTest):
     """
-    Performs a HTTP GET request to a list of pre-discovered peers
-    and time the response time, submit success status and timing
+    Performs an HTTP GET request to a list of pre-discovered peers
+    and times the response time, submits success status and timing.
     """
-    name = "HTTP vs HTTPS speed test"
-    description = "This test examines whether the https protocol is being throttled by"
-    "requesting the same resource both over plain http and TLSed one"
+    name = "HTTP reachability test"
+    description = "Examines whether other peers are reachable via HTTP"
     author = "vmon@asl19.org"
-    version = '0.0.1'
+    version = '0.0.2'
 
-    inputFile = ['file', 'f', None, 'File containing ip:port of peers running http server. ']
+    inputFile = ['file', 'f', None, 'File containing peers running an HTTP server. ']
     requiredOptions = ['file']
     requiresRoot = False
     requiresTor = False
