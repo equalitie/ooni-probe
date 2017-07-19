@@ -133,7 +133,7 @@ class PeerLocator(tcpt.TCPTest):
             proc = subprocess.Popen([
                 'python', 'ooni/utils/simple_http.py', '--port', http_server_port,
                 '--upnp' if behind_nat else '--noupnp'])
-            time.sleep(1)  #wait for start or crash
+            time.sleep(5)  #wait for start or crash
             proc_ret = proc.poll()
             if proc_ret is None:  #the server is running (or less probably too slow to start)
                 break
