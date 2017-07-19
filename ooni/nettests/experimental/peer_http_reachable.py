@@ -36,7 +36,7 @@ class PeerHttpReachable(httpt.HTTPTest):
         splitted = data.split()
         return PeerEntry(ts=float(splitted[0]),
                          addr=splitted[1],
-                         proto=splitted[2], flags=tuple(splitted([3:])))
+                         proto=splitted[2], flags=tuple(splitted[3:]))
 
     def inputProcessor(self, filename):
         """Iterate over each `PeerEntry` in the peers file."""
