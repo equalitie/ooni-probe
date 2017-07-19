@@ -45,7 +45,7 @@ def get_my_public_ip():
     return None  # no valid address found
 
 class UsageOptions(usage.Options):
-    optParameters = [['backend', 'b', 'http://127.0.0.1:57007',
+    optParameters = [['backend', 'b', '127.0.0.1:57007',
                       'URL of the test backend to use'],
                       ['peer_list', 'p', 'var/peer_list.txt',
                        'name of the file which stores the address of the peer'],
