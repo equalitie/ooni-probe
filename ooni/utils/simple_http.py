@@ -11,6 +11,7 @@ import sys
 DEFAULT_PORT = 8000
 EXIT_BIND_FAILED = 2
 EXIT_UPNP_FAILED = 3
+MAX_SERVER_AGE_SECS = 7 * 24 * 60 * 60  # quit after one week
 
 def error(message, code):
     sys.stderr.write(message)
@@ -57,10 +58,14 @@ def main():
     site = server.Site(Hello())
     try:
         reactor.listenTCP(listen_port, site)
+        reactor.callLater(MAX_SERVER_AGE_SECS, reactor.stop)
         reactor.run()
     except CannotListenError:
         error("Someone else is already listening on " + str(listen_port),
               EXIT_BIND_FAILED)
+
+    # Exit successfully after server max age.
+    sys.exit(0)
 
 if __name__ == '__main__':
     main()

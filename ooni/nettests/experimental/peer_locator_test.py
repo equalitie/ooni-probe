@@ -9,9 +9,25 @@ import ipaddr
 
 import random
 import re
+import socket
 import subprocess #running http server
 import time
 import urllib
+
+
+# Accept ``SECS.DEC IP:PORT PROTO[ FLAG]...`` from peer locator helper.
+_max_data_len = 100
+_data_re = re.compile(r'^[0-9]+\.[0-9]+ [\[\].:0-9a-f]+:[0-9]+ [A-Z]+( [_a-z]+)*$')
+
+# Based on <https://stackoverflow.com/a/28950776/6239236> by Jamieson Becker.
+def get_my_local_ip():
+    """Return the host's local IP address used to reach external hosts."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('192.0.2.1', 9))  # TEST-NET address (RFC 3330), discard service
+        return s.getsockname()[0]
+    finally:
+        s.close()
 
 # HTTP services which reply with the client's IP address in plain text.
 _ip_ident_services = [
@@ -40,7 +56,7 @@ def get_my_public_ip():
     return None  # no valid address found
 
 class UsageOptions(usage.Options):
-    optParameters = [['backend', 'b', 'http://127.0.0.1:57007',
+    optParameters = [['backend', 'b', '127.0.0.1:57007',
                       'URL of the test backend to use'],
                       ['peer_list', 'p', 'var/peer_list.txt',
                        'name of the file which stores the address of the peer'],
@@ -56,7 +72,7 @@ class PeerLocator(tcpt.TCPTest):
     so we can run web connectivity to them. 
     """
     name = "Peer Locator"
-    version = "0.1"
+    version = "0.2"
     authors = "vmon"
 
     usageOptions = UsageOptions
@@ -69,10 +85,14 @@ class PeerLocator(tcpt.TCPTest):
     
     def test_peer_locator(self):
         def got_response(response):
-            log.msg("received response %s from helper"%response)
+            response = response[:_max_data_len]
+            log.msg("received response from helper: %s"%response)
             if response == '':
                 log.msg('no peer available at this moment')
                 self.report['status'] = 'no peer found'
+            elif not _data_re.match(response):
+                log.msg('invalid response')
+                self.report['status'] = 'invalid response'
             else:
                 self.report['status'] = ''
                 with open(self.localOptions['peer_list'], 'a+') as peer_list:
@@ -92,7 +112,7 @@ class PeerLocator(tcpt.TCPTest):
             log.msg("Connection Refused")
 
         #identify whether we are behind NAT
-        local_ip = self.transport.getHost().host
+        local_ip = get_my_local_ip()
         if is_private_address(local_ip):
             behind_nat = True
         else:  #still check our visible address (if none, assume NAT)
@@ -113,7 +133,10 @@ class PeerLocator(tcpt.TCPTest):
             proc = subprocess.Popen([
                 'python', 'ooni/utils/simple_http.py', '--port', http_server_port,
                 '--upnp' if behind_nat else '--noupnp'])
-            time.sleep(1)  #wait for start or crash
+            for _ in range(5):  #wait for start or crash
+                if proc.poll() is not None:
+                    break
+                time.sleep(1)
             proc_ret = proc.poll()
             if proc_ret is None:  #the server is running (or less probably too slow to start)
                 break
@@ -128,8 +151,8 @@ class PeerLocator(tcpt.TCPTest):
                                 
         self.address, self.port = self.localOptions['backend'].split(":")
         self.port = int(self.port)
-        # HTTP server port and flags.
-        payload = str(http_server_port)
+        # HTTP server port, protocol and flags.
+        payload = '%s HTTP' % http_server_port
         payload += ' nat' if behind_nat else ' nonat'
         d = self.sendPayload(payload)
         d.addErrback(connection_failed)
