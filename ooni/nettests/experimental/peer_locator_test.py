@@ -9,6 +9,7 @@ import ipaddr
 
 import random
 import re
+import socket
 import subprocess #running http server
 import time
 import urllib
@@ -17,6 +18,16 @@ import urllib
 # Accept ``SECS.DEC IP:PORT PROTO[ FLAG]...`` from peer locator helper.
 _max_data_len = 100
 _data_re = re.compile(r'^[0-9]+\.[0-9]+ [\[\].:0-9a-f]+:[0-9]+ [A-Z]+( [_a-z]+)*$')
+
+# Based on <https://stackoverflow.com/a/28950776/6239236> by Jamieson Becker.
+def get_my_local_ip():
+    """Return the host's local IP address used to reach external hosts."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('192.0.2.1', 9))  # TEST-NET address (RFC 3330), discard service
+        return s.getsockname()[0]
+    finally:
+        s.close()
 
 # HTTP services which reply with the client's IP address in plain text.
 _ip_ident_services = [
@@ -101,7 +112,7 @@ class PeerLocator(tcpt.TCPTest):
             log.msg("Connection Refused")
 
         #identify whether we are behind NAT
-        local_ip = self.transport.getHost().host
+        local_ip = get_my_local_ip()
         if is_private_address(local_ip):
             behind_nat = True
         else:  #still check our visible address (if none, assume NAT)
