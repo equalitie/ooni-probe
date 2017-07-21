@@ -47,7 +47,7 @@ def get_my_public_ip():
             with closing(urllib.urlopen(url)) as conn:
                 ip = conn.read(_max_ip_len)
                 try:
-                    ipaddr.IP(ip)
+                    ipaddr.IPAddress(ip)
                 except ValueError:
                     continue
                 else:
