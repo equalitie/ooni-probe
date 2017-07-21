@@ -14,6 +14,7 @@ import subprocess #running http server
 import time
 import urllib
 
+from contextlib import closing
 
 # Accept ``SECS.DEC IP:PORT PROTO[ FLAG]...`` from peer locator helper.
 _max_data_len = 100
@@ -43,7 +44,7 @@ def get_my_public_ip():
     """
     for url in _ip_ident_services:
         try:
-            with urllib.urlopen(url) as conn:
+            with closing(urllib.urlopen(url)) as conn:
                 ip = conn.read(_max_ip_len)
                 try:
                     ipaddr.IP(ip)
