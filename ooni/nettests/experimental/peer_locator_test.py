@@ -16,9 +16,9 @@ import urllib
 
 from contextlib import closing
 
-# Accept ``SECS.DEC IP:PORT PROTO[ FLAG]...`` from peer locator helper.
+# Accept ``SECS.DEC IP:PORT PROTO [FLAG...]`` from peer locator helper.
 _max_data_len = 100
-_data_re = re.compile(r'^[0-9]+\.[0-9]+ [\[\].:0-9a-f]+:[0-9]+ [A-Z]+( [_a-z]+)*$')
+_data_re = re.compile(r'^[0-9]+\.[0-9]+ [\[\].:0-9a-f]+:[0-9]+ [A-Z]+( |( [_a-z]+)+)$')
 
 # Based on <https://stackoverflow.com/a/28950776/6239236> by Jamieson Becker.
 def get_my_local_ip():
