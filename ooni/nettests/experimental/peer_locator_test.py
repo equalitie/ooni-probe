@@ -157,7 +157,7 @@ class PeerLocator(tcpt.TCPTest):
         self.address, self.port = self.localOptions['backend'].split(":")
         self.port = int(self.port)
         # HTTP server port, protocol and flags.
-        payload = '%s HTTP' % http_server_port if is_server_running else 0
+        payload = '%s HTTP' % (http_server_port if is_server_running else 0)
         payload += ' nat' if behind_nat else ' nonat'
         d = self.sendPayload(payload)
         d.addErrback(connection_failed)
