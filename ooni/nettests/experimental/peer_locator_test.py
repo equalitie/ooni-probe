@@ -123,6 +123,7 @@ class PeerLocator(tcpt.TCPTest):
 
         http_server_port = self.localOptions['http_port']
         random_port = (http_server_port == 'random')
+        is_server_running = False
         for _ in range(10):  #try at most these times
             if random_port:  #get random port (with 50% probability for port 80)
                 if (random.randint(0,1) == 0):
@@ -140,20 +141,23 @@ class PeerLocator(tcpt.TCPTest):
                 time.sleep(1)
             proc_ret = proc.poll()
             if proc_ret is None:  #the server is running (or less probably too slow to start)
+                is_server_running = True
                 break
             elif proc_ret == 2 and not random_port:  #the forced port was busy
-                raise RuntimeError("failed to bind to requested port %s" % http_server_port)
+                log.msg("failed to bind to requested port %s" % http_server_port)
+                break
             elif proc_ret == 3:  #issues with UPnP port mapping
-                raise RuntimeError("failed to map port using UPnP")
+                log.msg("failed to map port using UPnP")
+                break
             #retry with another port
         else:
             #fail, do not report a failed port or a port not used by us
-            raise RuntimeError("exceeded retries for running an HTTP server")
+            log.msg("exceeded retries for running an HTTP server")
                                 
         self.address, self.port = self.localOptions['backend'].split(":")
         self.port = int(self.port)
         # HTTP server port, protocol and flags.
-        payload = '%s HTTP' % http_server_port
+        payload = '%s HTTP' % (http_server_port if is_server_running else 0)
         payload += ' nat' if behind_nat else ' nonat'
         d = self.sendPayload(payload)
         d.addErrback(connection_failed)
