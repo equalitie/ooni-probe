@@ -146,8 +146,10 @@ class PeerLocator(tcpt.TCPTest):
             elif proc_ret == 2 and not random_port:  #the forced port was busy
                 log.msg("failed to bind to requested port %s" % http_server_port)
                 break
-            elif proc_ret == 3:  #issues with UPnP port mapping
+            elif proc_ret == 3 and not random_port:  #issues with UPnP port mapping
                 log.msg("failed to map port using UPnP")
+            elif proc_ret == 4:  #UPnP not available
+                log.msg("UPnP is not available, can not map port")
                 break
             #retry with another port
         else:

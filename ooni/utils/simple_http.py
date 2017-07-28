@@ -11,6 +11,7 @@ import sys
 DEFAULT_PORT = 8000
 EXIT_BIND_FAILED = 2
 EXIT_UPNP_FAILED = 3
+EXIT_UPNP_MISSING = 4
 MAX_SERVER_AGE_SECS = 7 * 24 * 60 * 60  # quit after one week
 
 def error(message, code):
@@ -45,7 +46,7 @@ def main():
         upnp = UPnP()
         upnp.discoverdelay = 10
         if upnp.discover() < 1:
-            error("No UPnP IGD devices were discovered", EXIT_UPNP_FAILED)
+            error("No UPnP IGD devices were discovered", EXIT_UPNP_MISSING)
         upnp.selectigd()
         if not upnp.addportmapping(
                 listen_port, 'TCP', upnp.lanaddr, listen_port,
