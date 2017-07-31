@@ -57,6 +57,7 @@ class PeerHttpReachable(httpt.HTTPTest):
         peer = self.input
         log.msg(str(peer))
         self.http_url = 'http://%s/' % peer.addr
+        self.report['http_response_time'] = None
         self.report['http_success'] = False
         self.report['peer_ts'] = peer.ts
         self.report['peer_nat'] = b'nonat' not in peer.flags
