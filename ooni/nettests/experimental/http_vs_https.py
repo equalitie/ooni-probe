@@ -38,7 +38,7 @@ class HTTPVsHTTPSSpeedTest(httpt.HTTPTest):
 
         for scheme in ['http','https']:
             self.report[scheme+'_success'] = False
-            self.report[scheme+'_response_time'] = -1
+            self.report[scheme+'_response_time'] = None
 
     def test_http_speed(self):
         """
