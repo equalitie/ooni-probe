@@ -4,6 +4,11 @@ from twisted.python import usage
 from ooni import nettest
 
 
+# Argument coercion functions are ignored by OONI.
+def _unpackRemoteAddrs(s):
+    return [(h.translate(None, '[]'), int(p))  # remove IPv6 brackets, convert port to integer
+            for (h, p) in (a.rsplit(':', 1) for a in s.split(',') if s)]  # split on comma, then on colon
+
 class _NATDetectionOptions(usage.Options):
     optFlags = [
         ['upnp', 'u', "Attempt to establish a temporary port redirection using UPnP at the gateway."],
@@ -194,4 +199,16 @@ class NATDetectionTest(nettest.NetTestCase):
     requiresTor = False
 
     def testDummy(self):
+        mainRemotes = _unpackRemoteAddrs(self.localOptions['remotes'])
+        altRemotes = _unpackRemoteAddrs(self.localOptions['alt-remotes'] or '')
+        tryUPnP = bool(self.localOptions['upnp'])
+
+        # Compute destination remotes and source remotes.
+        dstRemotes = mainRemotes
+        srcRemotes = dstRemotes + altRemotes
+        _dstRemoteHosts = set(r[0] for r in dstRemotes)
+
+        if len(_dstRemoteHosts) < 2:
+            raise ValueError("at least 2 different hosts are needed as main remotes")
+
         return defer.Deferred()
