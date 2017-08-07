@@ -124,7 +124,33 @@ class NATDetectionTest(nettest.NetTestCase):
     Detected NAT types
     ------------------
 
-    XXXX TBD
+    The NAT is identified as ``symmetric`` or ``full-cone``.  If traffic from
+    alternate remotes is received, ``host-open`` or ``port-open``  is added to
+    indicate that the absence of host or port restrictions was detected.  If
+    alternate remotes were specified but no traffic was received from them,
+    ``probably-restricted`` is appended (maybe the NAT is restricted or maybe
+    their messages got blocked for other reasons).  If no alternate remotes
+    were specified, ``uncertain-restricted`` is appended since there is no way
+    to identify address or port restrictions.
+
+    Examples:
+
+    - ``symmetric uncertain-restricted``: Symmetric NAT detected, no detection
+      of restrictions was possible (no alternative remotes).
+
+    - ``full-cone probably-restricted``: Full-cone NAT detected, but no
+      messages from alternate remotes were received.  Most usual case with
+      full-cone NAT and no UPnP or other port redirection.
+
+    - ``full-cone host-open``: Full-cone NAT detected, plus messages from an
+      alternate remote host were received.  Most usual case with full-cone NAT
+      plus UPnP or other port redirection.
+
+    - ``full-cone port-open``: Full-cone NAT detected, plus messages from an
+      alternate remote with the same host address as some main remote were
+      received (but none from alternate remotes on different hosts).
+
+    If there is not enough information to decide, ``uncertain`` is reported.
     """
 
     name = "NAT detection test"
