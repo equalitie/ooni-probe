@@ -119,7 +119,32 @@ class NATDetectionTest(nettest.NetTestCase):
     Datagram classification
     -----------------------
 
-    XXXX TBD
+    The probe tags datagrams with a string that represents their validity and
+    hints on NAT type decision or possible attacks.  Possible values are:
+
+    ``invalid_malformed``
+      The datagram payload does not follow the format for the NAT detection
+      protocol.  Maybe a stranded datagram or some probing attack.
+
+    ``invalid_notmyrequest``
+      The datagram payload has a valid format but the reported test ID is
+      wrong.  Probably an attempt of replay attack.
+
+    ``invalid_badremote``
+      The format and test ID are valid, but the source is unknown.  Maybe an
+      up-to-date replay attack, but most probably an alternate remote address
+      was set up in servers and not added to test probes.
+
+    ``valid``
+      A valid message coming from a main remote address.
+
+    ``valid_altport``
+      A valid message coming from an alternate remote address whose host is
+      among main remotes.  Probably the NAT has no port restrictions.
+
+    ``valid_althost``
+      A valid message coming from an alternate remote address whose host is
+      not among main remotes.  Probably the NAT has no host restrictions.
 
     Detected NAT types
     ------------------
