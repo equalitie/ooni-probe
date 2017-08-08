@@ -1,7 +1,13 @@
-from twisted.internet import defer
+import os
+
+from twisted.internet import defer, protocol, reactor
 from twisted.python import usage
 
 from ooni import nettest
+from ooni.utils import log
+
+
+TEST_ID_BYTES = 8
 
 
 # Argument coercion functions are ignored by OONI.
@@ -18,6 +24,30 @@ class _NATDetectionOptions(usage.Options):
         ['remotes', 'r', None, "Comma-separated of IP:PORT addresses of destination/source (main) remotes."],
         ['alt-remotes', 'R', None, "Comma-separated of IP:PORT addresses of source-only (alternate) remotes."],
     ]
+
+class _NatDetectionClient(protocol.DatagramProtocol):
+    def __init__(self, testId, remotes, altRemotes=[], tryUPnP=False):
+        self.testId = testId
+
+        # Compute destination remotes and source remotes.
+        self.dstRemotes = list(remotes)
+        self.srcRemotes = remotes + altRemotes
+        self._dstRemoteHosts = set(r[0] for r in self.dstRemotes)
+
+        if len(self._dstRemoteHosts) < 2:
+            raise ValueError("at least 2 different hosts are needed as main remotes")
+
+        self.tryUPnP = tryUPnP
+
+    def datagramReceived(self, data, addr):
+        log.msg('RECV %s %s' % (addr, data))
+        self.deferred.callback('done')
+
+    def startProtocol(self):
+        for remote in self.dstRemotes:
+            message = 'NATDET ' + self.testId
+            log.msg('SEND %s %s' % (remote, message))
+            self.transport.write(message, remote)
 
 class NATDetectionTest(nettest.NetTestCase):
     """Basic NAT detection test using UDP.
@@ -214,17 +244,18 @@ class NATDetectionTest(nettest.NetTestCase):
     requiresRoot = False
     requiresTor = False
 
+    timeout = 5
+
     def testDummy(self):
         mainRemotes = _unpackRemoteAddrs(self.localOptions['remotes'])
         altRemotes = _unpackRemoteAddrs(self.localOptions['alt-remotes'] or '')
         tryUPnP = bool(self.localOptions['upnp'])
 
-        # Compute destination remotes and source remotes.
-        dstRemotes = mainRemotes
-        srcRemotes = dstRemotes + altRemotes
-        _dstRemoteHosts = set(r[0] for r in dstRemotes)
+        # Instantiate the protocol with the given options.
+        testId = os.urandom(TEST_ID_BYTES).encode('hex')
+        proto = _NatDetectionClient(testId, mainRemotes, altRemotes, tryUPnP=tryUPnP)
 
-        if len(_dstRemoteHosts) < 2:
-            raise ValueError("at least 2 different hosts are needed as main remotes")
-
-        return defer.Deferred()
+        deferred = defer.Deferred()
+        proto.deferred = deferred
+        reactor.listenUDP(0, proto)
+        return deferred
