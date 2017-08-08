@@ -22,16 +22,20 @@ class _NATDetectionOptions(usage.Options):
 class NATDetectionTest(nettest.NetTestCase):
     """Basic NAT detection test using UDP.
 
-    This test attempts to detect the *type of NAT* sitting before the probe
-    (either full-cone or symmetric) by contacting specific remote transport
-    addresses via UDP, as well as to detect the absence of *host and port
-    restrictions* when receiving UDP traffic from other transport addresses
-    not contacted before.
+    (Please see `RFC 4787 <https://tools.ietf.org/html/rfc4787>`_
+    and `Methods of translation <https://en.wikipedia.org/wiki/Network_address_translation#Methods_of_translation>`_
+    for a further explanation of the terms mentioned below.)
+
+    This test attempts to detect the type of NAT sitting before the probe,
+    both by contacting specific remote transport addresses via UDP to infer
+    the type of *NAT mapping*, as well as receiving UDP traffic from other
+    remote transport addresses not contacted before to infer the type of *NAT
+    filtering*.
 
     It simply sends UDP messages to the given main remotes, until it receives
     a reply back from all of them (plus the given alternate remotes) or gives
     up after a maximum number of tries.  It uses a fixed source port, which is
-    essential to detect NAT type.
+    essential to detect the type of NAT.
 
     The *protocol* is very simple.  The test instance generates a random
     identifier consisting of 8 bytes (or 16 hexadecimal digits), then it sends
@@ -47,10 +51,11 @@ class NATDetectionTest(nettest.NetTestCase):
     remotes.
 
     At least two different hosts must be specified as main remotes for the
-    test to work, and they all must reply for the test to determine the NAT
-    type.  Additionally, alternate remotes may be specified in different ports
-    or different hosts than the main ones to be able to detect the absence of
-    port restrictions and host restrictions, respectively.
+    test to work, and they all must reply for the test to determine the type
+    of NAT mapping.  Additionally, alternate remotes may be specified in
+    different ports or different hosts than the main ones to be able to detect
+    the absence of port-dependent filtering and address-dependent filtering,
+    respectively.
 
     In any case, *all received datagrams are reported* in the test output for
     further analysis or correcting the probe's decisions.  Datagrams with the
@@ -58,10 +63,10 @@ class NATDetectionTest(nettest.NetTestCase):
     timestamps of their first and last arrival.
 
     The test can be instructed to attempt to setup *port redirection* at the
-    gateway using UPnP.  This may be useful to detect NAT type in an upstream
-    gateway (e.g. for mobile connections, CGNAT or other situations where the
-    gateway does not have a public external IP address).  The test is still
-    attempted if the redirection fails.
+    gateway using UPnP.  This may be useful to detect the type of NAT in an
+    upstream gateway (e.g. for mobile connections, CGNAT or other situations
+    where the gateway does not have a public external IP address).  The test
+    is still attempted if the redirection fails.
 
     The output of the test consists of the following members:
 
@@ -85,7 +90,7 @@ class NATDetectionTest(nettest.NetTestCase):
       (boolean).
 
     ``nat_type``
-      A guess of the type of NAT and its restrictions from received traffic
+      A guess of the type of NAT mapping and filtering from received traffic
       (string, see below).
 
     ``data_received``
@@ -145,52 +150,63 @@ class NATDetectionTest(nettest.NetTestCase):
 
     ``valid_altport``
       A valid message coming from an alternate remote address whose host is
-      among main remotes.  Probably the NAT has no port restrictions.
+      among main remotes.  Probably the NAT has no port-dependent filtering.
 
     ``valid_althost``
       A valid message coming from an alternate remote address whose host is
-      not among main remotes.  Probably the NAT has no host restrictions.
+      not among main remotes.  Probably the NAT has no address-dependent
+      filtering.
 
     Detected NAT types
     ------------------
 
-    The NAT is identified as ``symmetric`` or ``full-cone``.  If traffic from
-    alternate remotes is received, ``host-open`` or ``port-open``  is added to
-    indicate that the absence of host or port restrictions was detected.  If
-    alternate remotes were specified but no traffic was received from them,
-    ``probably-restricted`` is appended (maybe the NAT is restricted or maybe
-    their messages got blocked for other reasons).  If no alternate remotes
-    were specified, ``uncertain-restricted`` is appended since there is no way
-    to identify address or port restrictions.
+    The detected NAT type is reported as ``'map:TYPE filter:TYPE'``.
+
+    The NAT mapping is reported as either ``'map:addr-or-port-dep'`` or
+    ``'map:endpoint-indep'``.  If traffic from some main remote is not
+    received, ``'map:uncertain'`` is reported since there is not enough
+    information to decide.
+
+    If traffic from alternate remotes is received, the NAT filtering is
+    reported as either ``'filter:endpoint-indep'`` or ``'filter:port-indep'``
+    to indicate that the absence of address-dependent or port-dependent
+    filtering was detected.  If alternate remotes were specified but no
+    traffic was received from them, ``'filter:probable'`` is reported (maybe
+    the NAT does filtering or maybe their messages got blocked for other
+    reasons).  If no alternate remotes were specified, ``'filter:ignored'`` is
+    reported since there is no way to identify address-dependent or
+    port-dependent filtering.
 
     Examples:
 
-    - ``symmetric uncertain-restricted``: Symmetric NAT detected, no detection
-      of restrictions was possible (no alternative remotes).
+    - ``map:addr-or-port-dep filter:ignored``: Adddress- or port-dependent NAT
+      mapping (i.e. symmetric NAT) detected, no detection of filtering was
+      possible (no alternate remotes).
 
-    - ``full-cone probably-restricted``: Full-cone NAT detected, but no
-      messages from alternate remotes were received.  Most usual case with
-      full-cone NAT and no UPnP or other port redirection.
+    - ``map:endpoint-indep filter:probable``: Endpoint-independent NAT mapping
+      (i.e. cone NAT) detected, but no messages from alternate remotes were
+      received.  Most usual case with cone NAT and no UPnP or other port
+      redirection.
 
-    - ``full-cone host-open``: Full-cone NAT detected, plus messages from an
-      alternate remote host were received.  Most usual case with full-cone NAT
-      plus UPnP or other port redirection.
+    - ``map:endpoint-indep filter:endpoint-indep``: Endpoint-independent NAT
+      mapping (i.e. cone NAT) detected, plus messages from an alternate remote
+      host were received.  Most usual case with cone NAT plus UPnP or other
+      port redirection.
 
-    - ``full-cone port-open``: Full-cone NAT detected, plus messages from an
-      alternate remote with the same host address as some main remote were
-      received (but none from alternate remotes on different hosts).
-
-    If there is not enough information to decide, ``uncertain`` is reported.
+    - ``map:endpoint-indep filter:port-indep``: Endpoint-independent NAT
+      mapping (i.e. cone NAT) detected, plus messages from an alternate remote
+      with the same host address as some main remote were received (but none
+      from alternate remotes on different hosts).
     """
 
     name = "NAT detection test"
     author = "kheops2713 and ivilata over an idea of inetic"
     version = '0.1'
     description = "Attempts to detect the type of NAT before the probe, " \
-                  "including the absence of host and port restrictions. " \
+                  "including type of mapping and filtering (as per RFC 4787). " \
                   "At least two different hosts must be specified as main remotes, " \
                   "and alternate remotes in different ports or hosts than the main ones " \
-                  "are needed for detection of restrictions."
+                  "are needed for detection of filtering."
 
     usageOptions = _NATDetectionOptions
     requiredOptions = ['remotes']
