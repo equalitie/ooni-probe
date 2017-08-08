@@ -1,5 +1,6 @@
 import os
 
+from miniupnpc import UPnP
 from twisted.internet import defer, protocol, reactor
 from twisted.python import usage
 
@@ -38,16 +39,35 @@ class _NatDetectionClient(protocol.DatagramProtocol):
             raise ValueError("at least 2 different hosts are needed as main remotes")
 
         self.tryUPnP = tryUPnP
+        self._UPnP = None
+        self._UPnPPort = None
 
     def datagramReceived(self, data, addr):
         log.msg('RECV %s %s' % (addr, data))
         self.deferred.callback('done')
 
     def startProtocol(self):
+        # Try to configure UPnP if requested.
+        if self.tryUPnP:
+            upnp = UPnP()
+            upnp.discoverdelay = 10
+            if upnp.discover() > 0:
+                upnp.selectigd()
+                port = self.transport.getHost().port
+                if upnp.addportmapping(port, 'UDP', upnp.lanaddr, port,
+                                       "OONI NAT type detection test", ''):
+                    self._UPnP = upnp
+                    self._UPnPPort = port  # transport not available on protocol stop
+
         for remote in self.dstRemotes:
             message = 'NATDET ' + self.testId
             log.msg('SEND %s %s' % (remote, message))
             self.transport.write(message, remote)
+
+    def stopProtocol(self):
+        # Remove the port mapping, if configured.
+        if self._UPnP:
+            self._UPnP.deleteportmapping(self._UPnPPort, 'UDP')
 
 class NATDetectionTest(nettest.NetTestCase):
     """Basic NAT detection test using UDP.
