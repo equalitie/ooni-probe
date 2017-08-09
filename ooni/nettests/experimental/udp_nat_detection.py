@@ -30,8 +30,8 @@ from ooni import nettest
 TEST_ID_BYTES = 8
 """Default maximum number of times to send a message to a remote."""
 MAX_SEND_DEF = 10
-"""Interval between message sends (in seconds)."""
-SEND_INTERVAL_SECS = 5
+"""Default interval between message sends (in seconds)."""
+SEND_INTERVAL_SECS_DEF = 5
 
 # Format: "NATDET <hex test id> <IP>:<PORT>" (with bracketed IPv6).
 _data_re = re.compile(r'^NATDET [0-9a-f]{%d} [\[\].:0-9a-f]+:[0-9]+$' % (2 * TEST_ID_BYTES))
@@ -94,10 +94,12 @@ class _NATDetectionOptions(usage.Options):
         ['remotes', 'r', None, "Comma-separated of IP:PORT addresses of destination/source (main) remotes."],
         ['alt-remotes', 'R', None, "Comma-separated of IP:PORT addresses of source-only (alternate) remotes."],
         ['max-send', 'c', MAX_SEND_DEF, "Maximum number of times to send a message to a remote."],
+        ['send-interval', 'i', SEND_INTERVAL_SECS_DEF, "Interval between message sends (in seconds)."],
     ]
 
 class _NATDetectionClient(protocol.DatagramProtocol):
-    def __init__(self, testId, remotes, altRemotes=[], tryUPnP=False, maxSend=MAX_SEND_DEF):
+    def __init__(self, testId, remotes, altRemotes=[],
+                 tryUPnP=False, maxSend=MAX_SEND_DEF, sendInterval=SEND_INTERVAL_SECS_DEF):
         self.testId = testId
 
         # Compute destination remotes and source remotes.
@@ -113,6 +115,7 @@ class _NATDetectionClient(protocol.DatagramProtocol):
         self._UPnPPort = None
 
         self.maxSend = maxSend
+        self.sendInterval = sendInterval
         self._loopCalls = {}
         self._sendCounter = {}
         self._sendDone = 0
@@ -184,7 +187,7 @@ class _NATDetectionClient(protocol.DatagramProtocol):
         for remote in self.dstRemotes:
             self._sendCounter[remote] = 0
             self._loopCalls[remote] = call = task.LoopingCall(self.sendMessage, remote)
-            call.start(SEND_INTERVAL_SECS, now=False)
+            call.start(self.sendInterval, now=False)
 
     def stopProtocol(self):
         # Stop periodic sends.
@@ -404,10 +407,12 @@ class NATDetectionTest(nettest.NetTestCase):
         altRemotes = _unpackRemoteAddrs(self.localOptions['alt-remotes'] or '')
         tryUPnP = bool(self.localOptions['upnp'])
         maxSend = int(self.localOptions['max-send'])
+        sendInterval = int(self.localOptions['send-interval'])
 
         # Instantiate the protocol with the given options.
         testId = os.urandom(TEST_ID_BYTES).encode('hex')
-        proto = _NATDetectionClient(testId, mainRemotes, altRemotes, tryUPnP=tryUPnP, maxSend=maxSend)
+        proto = _NATDetectionClient(testId, mainRemotes, altRemotes,
+                                    tryUPnP=tryUPnP, maxSend=maxSend)
 
         def updateReport(result):
             rep = self.report
@@ -417,6 +422,7 @@ class NATDetectionTest(nettest.NetTestCase):
             rep['alt_remotes'] = [{'host': h, 'port': p} for (h, p) in altRemotes]
             rep['data_received'] = flatReceived = _flattenReceived(proto)
             rep['max_send'] = maxSend
+            rep['send_interval'] = sendInterval
             rep['upnp_active'] = proto.isUPnPActive()
             rep['nat_type'] = _guessNATType(flatReceived, mainRemotes, altRemotes)
 
