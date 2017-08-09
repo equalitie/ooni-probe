@@ -412,7 +412,7 @@ class NATDetectionTest(nettest.NetTestCase):
         # Instantiate the protocol with the given options.
         testId = os.urandom(TEST_ID_BYTES).encode('hex')
         proto = _NATDetectionClient(testId, mainRemotes, altRemotes,
-                                    tryUPnP=tryUPnP, maxSend=maxSend)
+                                    tryUPnP=tryUPnP, maxSend=maxSend, sendInterval=sendInterval)
 
         def updateReport(result):
             rep = self.report
