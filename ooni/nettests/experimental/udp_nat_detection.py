@@ -39,6 +39,36 @@ def _flattenReceived(proto):
         key=(lambda dg: (dg['time_first'], dg['source_addr']))
     )
 
+def _guessNATType(flatReceived, mainRemotes, altRemotes):
+    """Attempt to identify the type of NAT as ``'map:TYPE filter:TYPE'``."""
+    validMsgs = [m for m in flatReceived if m['probe_decision'].startswith('valid')]
+
+    # Did we receive messages from all main remotes?
+    validSrcs = set((m['source_addr']['host'], m['source_addr']['port']) for m in validMsgs)
+    if set(mainRemotes) - validSrcs:
+        mapping = 'map:uncertain'  # insufficient information
+    # Did remotes report different source addresses from us?
+    elif len(set(m['data'].split()[2] for m in validMsgs)) > 1:
+        mapping = 'map:addr-or-port-dep'  # different destinations get a different source port
+    else:
+        mapping = 'map:endpoint-indep'  # all remotes reported the same address
+
+    # Did we get messages from alternate remotes...
+    validMsgTypes = set(m['probe_decision'] for m in validMsgs)
+    # ... with a host address not among main remotes?
+    if 'valid_althost' in validMsgTypes:
+        filtering = 'filter:endpoint-indep'  # address-independent filter (assume port-independent as per RFC)
+    # ... with a host address among main remotes?
+    elif 'valid_altport' in validMsgTypes:
+        filtering = 'filter:port-indep'  # port-independent
+    elif altRemotes:
+        filtering = 'filter:probable'  # no messages from existing alternate remotes
+    else:
+        filtering = 'filter:ignored'  # can not tell whether there is filtering or not
+
+    return '%s %s' % (mapping, filtering)
+
+
 class _NATDetectionOptions(usage.Options):
     optFlags = [
         ['upnp', 'u', "Attempt to establish a temporary port redirection using UPnP at the gateway."],
@@ -367,8 +397,9 @@ class NATDetectionTest(nettest.NetTestCase):
             rep['source_port'] = sourcePort
             rep['remotes'] = [{'host': h, 'port': p} for (h, p) in mainRemotes]
             rep['alt_remotes'] = [{'host': h, 'port': p} for (h, p) in altRemotes]
-            rep['data_received'] = _flattenReceived(proto)
+            rep['data_received'] = flatReceived = _flattenReceived(proto)
             rep['upnp_active'] = proto.isUPnPActive()
+            rep['nat_type'] = _guessNATType(flatReceived, mainRemotes, altRemotes)
 
         deferred = defer.Deferred()
         deferred.addCallback(updateReport)
