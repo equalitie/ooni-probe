@@ -349,7 +349,14 @@ class NATDetectionTest(nettest.NetTestCase):
         testId = os.urandom(TEST_ID_BYTES).encode('hex')
         proto = _NatDetectionClient(testId, mainRemotes, altRemotes, tryUPnP=tryUPnP)
 
+        def updateReport(result):
+            rep = self.report
+            rep['test_id'] = testId
+            rep['remotes'] = [{'host': h, 'port': p} for (h, p) in mainRemotes]
+            rep['alt_remotes'] = [{'host': h, 'port': p} for (h, p) in altRemotes]
+
         deferred = defer.Deferred()
+        deferred.addCallback(updateReport)
         proto.deferred = deferred
         reactor.listenUDP(0, proto)
         return deferred
