@@ -352,7 +352,7 @@ class NATDetectionTest(nettest.NetTestCase):
     requiresRoot = False
     requiresTor = False
 
-    def testDummy(self):
+    def testDetectNAT(self):
         mainRemotes = _unpackRemoteAddrs(self.localOptions['remotes'])
         altRemotes = _unpackRemoteAddrs(self.localOptions['alt-remotes'] or '')
         tryUPnP = bool(self.localOptions['upnp'])
