@@ -93,6 +93,7 @@ class _NATDetectionOptions(usage.Options):
     optParameters = [
         ['remotes', 'r', None, "Comma-separated of IP:PORT addresses of destination/source (main) remotes."],
         ['alt-remotes', 'R', None, "Comma-separated of IP:PORT addresses of source-only (alternate) remotes."],
+        ['max-send', 'c', MAX_SEND_DEF, "Maximum number of times to send a message to a remote."],
     ]
 
 class _NATDetectionClient(protocol.DatagramProtocol):
@@ -402,10 +403,11 @@ class NATDetectionTest(nettest.NetTestCase):
         mainRemotes = _unpackRemoteAddrs(self.localOptions['remotes'])
         altRemotes = _unpackRemoteAddrs(self.localOptions['alt-remotes'] or '')
         tryUPnP = bool(self.localOptions['upnp'])
+        maxSend = int(self.localOptions['max-send'])
 
         # Instantiate the protocol with the given options.
         testId = os.urandom(TEST_ID_BYTES).encode('hex')
-        proto = _NATDetectionClient(testId, mainRemotes, altRemotes, tryUPnP=tryUPnP)
+        proto = _NATDetectionClient(testId, mainRemotes, altRemotes, tryUPnP=tryUPnP, maxSend=maxSend)
 
         def updateReport(result):
             rep = self.report
@@ -414,6 +416,7 @@ class NATDetectionTest(nettest.NetTestCase):
             rep['remotes'] = [{'host': h, 'port': p} for (h, p) in mainRemotes]
             rep['alt_remotes'] = [{'host': h, 'port': p} for (h, p) in altRemotes]
             rep['data_received'] = flatReceived = _flattenReceived(proto)
+            rep['max_send'] = maxSend
             rep['upnp_active'] = proto.isUPnPActive()
             rep['nat_type'] = _guessNATType(flatReceived, mainRemotes, altRemotes)
 
