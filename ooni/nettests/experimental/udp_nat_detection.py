@@ -8,7 +8,6 @@ from twisted.internet import defer, protocol, reactor, task
 from twisted.python import usage
 
 from ooni import nettest
-from ooni.utils import log
 
 
 """Test identifier length (in bytes, double for hex)."""
@@ -61,12 +60,27 @@ class _NatDetectionClient(protocol.DatagramProtocol):
         self._loopCalls = {}
         self._received = {}
 
+    def isUPnPActive(self):
+        return self._UPnP is not None
+
+    @property
+    def received(self):
+        """A flattened view of received datagrams.
+
+        Sorted by time of first reception and source address.
+        """
+        return sorted(
+            [dict(source_addr={'host': addr[0], 'port': addr[1]}, hash=hash_, **dgdata)
+             for (addr, msgs) in self._received.items()
+             for (hash_, dgdata) in msgs.items()],
+            key=(lambda dg: (dg['time_first'], dg['source_addr']))
+        )
+
     def datagramReceived(self, data, addr):
         rtime = time.time()
         datahash = hashlib.sha256(data).hexdigest()
         reallen = len(data)
         data = data[:_max_data_len]
-        log.msg('RECV %s %s' % (addr, data))
 
         received = self._received
 
@@ -137,7 +151,6 @@ class _NatDetectionClient(protocol.DatagramProtocol):
 
     def sendMessage(self, remote):
         message = 'NATDET ' + self.testId
-        log.msg('SEND %s %s' % (remote, message))
         self.transport.write(message, remote)
         self._sendCounter[remote] += 1
         if self._sendCounter[remote] == self.maxSend:
@@ -352,11 +365,15 @@ class NATDetectionTest(nettest.NetTestCase):
         def updateReport(result):
             rep = self.report
             rep['test_id'] = testId
+            rep['source_port'] = sourcePort
             rep['remotes'] = [{'host': h, 'port': p} for (h, p) in mainRemotes]
             rep['alt_remotes'] = [{'host': h, 'port': p} for (h, p) in altRemotes]
+            rep['data_received'] = proto.received
+            rep['upnp_active'] = proto.isUPnPActive()
 
         deferred = defer.Deferred()
         deferred.addCallback(updateReport)
         proto.deferred = deferred
-        reactor.listenUDP(0, proto)
+        lp = reactor.listenUDP(0, proto)
+        sourcePort = lp.getHost().port
         return deferred
