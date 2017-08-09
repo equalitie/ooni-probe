@@ -1,3 +1,19 @@
+"""UDP-based NAT detection net test.
+
+Example invocation::
+
+    $ ooniprobe -n /path/to/this_file.py \
+          -r 127.0.0.1:12345,127.0.0.2:54321 \
+          -R 127.0.0.1:12346,127.0.0.3:13579
+
+This can be completed for instance with
+
+* Server 1 listening on 127.0.0.1:12345, 127.0.0.1:12346, 127.0.0.3:13579
+* Server 2 listening on 127.0.0.2:54321
+
+See the documentation of the `NATDetectionTest` class for more information.
+"""
+
 import os
 import re
 import time
