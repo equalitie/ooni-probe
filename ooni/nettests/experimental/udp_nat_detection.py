@@ -273,6 +273,12 @@ class NATDetectionTest(nettest.NetTestCase):
       The transport addresses of the given alternate remotes (same format as
       main remotes).
 
+    ``max_send``
+      The maximum number of times to send a message to a remote (number).
+
+    ``send_interval``
+      The interval between message sends, in seconds (number).
+
     ``upnp_active``
       Whether the test was performed with an active UPnP port redirection
       (boolean).
@@ -420,10 +426,10 @@ class NATDetectionTest(nettest.NetTestCase):
             rep['source_port'] = sourcePort
             rep['remotes'] = [{'host': h, 'port': p} for (h, p) in mainRemotes]
             rep['alt_remotes'] = [{'host': h, 'port': p} for (h, p) in altRemotes]
-            rep['data_received'] = flatReceived = _flattenReceived(proto)
             rep['max_send'] = maxSend
             rep['send_interval'] = sendInterval
             rep['upnp_active'] = proto.isUPnPActive()
+            rep['data_received'] = flatReceived = _flattenReceived(proto)
             rep['nat_type'] = _guessNATType(flatReceived, mainRemotes, altRemotes)
 
         deferred = defer.Deferred()
