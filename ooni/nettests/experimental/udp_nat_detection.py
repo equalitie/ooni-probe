@@ -27,6 +27,18 @@ def _unpackRemoteAddrs(s):
     return [(h.translate(None, '[]'), int(p))  # remove IPv6 brackets, convert port to integer
             for (h, p) in (a.rsplit(':', 1) for a in s.split(',') if s)]  # split on comma, then on colon
 
+def _flattenReceived(proto):
+    """A flattened view of the datagrams received by the `proto`.
+
+    Sorted by time of first reception and source address.
+    """
+    return sorted(
+        [dict(source_addr={'host': addr[0], 'port': addr[1]}, hash=hash_, **dgdata)
+         for (addr, msgs) in proto.received.items()
+         for (hash_, dgdata) in msgs.items()],
+        key=(lambda dg: (dg['time_first'], dg['source_addr']))
+    )
+
 class _NATDetectionOptions(usage.Options):
     optFlags = [
         ['upnp', 'u', "Attempt to establish a temporary port redirection using UPnP at the gateway."],
@@ -54,27 +66,14 @@ class _NATDetectionClient(protocol.DatagramProtocol):
         self._UPnPPort = None
 
         self.maxSend = maxSend
+        self._loopCalls = {}
         self._sendCounter = {}
         self._sendDone = 0
 
-        self._loopCalls = {}
-        self._received = {}
+        self.received = {}
 
     def isUPnPActive(self):
         return self._UPnP is not None
-
-    @property
-    def received(self):
-        """A flattened view of received datagrams.
-
-        Sorted by time of first reception and source address.
-        """
-        return sorted(
-            [dict(source_addr={'host': addr[0], 'port': addr[1]}, hash=hash_, **dgdata)
-             for (addr, msgs) in self._received.items()
-             for (hash_, dgdata) in msgs.items()],
-            key=(lambda dg: (dg['time_first'], dg['source_addr']))
-        )
 
     def datagramReceived(self, data, addr):
         rtime = time.time()
@@ -82,7 +81,7 @@ class _NATDetectionClient(protocol.DatagramProtocol):
         reallen = len(data)
         data = data[:_max_data_len]
 
-        received = self._received
+        received = self.received
 
         if addr not in received:
             received[addr] = {}
@@ -368,7 +367,7 @@ class NATDetectionTest(nettest.NetTestCase):
             rep['source_port'] = sourcePort
             rep['remotes'] = [{'host': h, 'port': p} for (h, p) in mainRemotes]
             rep['alt_remotes'] = [{'host': h, 'port': p} for (h, p) in altRemotes]
-            rep['data_received'] = proto.received
+            rep['data_received'] = _flattenReceived(proto)
             rep['upnp_active'] = proto.isUPnPActive()
 
         deferred = defer.Deferred()
