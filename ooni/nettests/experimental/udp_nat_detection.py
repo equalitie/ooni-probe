@@ -31,7 +31,7 @@ TEST_ID_BYTES = 8
 """Default maximum number of times to send a message to a remote."""
 MAX_SEND_DEF = 10
 """Default interval between message sends (in seconds)."""
-SEND_INTERVAL_SECS_DEF = 5
+SEND_INTERVAL_SECS_DEF = 5.0
 
 # Format: "NATDET <hex test id> <IP>:<PORT>" (with bracketed IPv6).
 _data_re = re.compile(r'^NATDET [0-9a-f]{%d} [\[\].:0-9a-f]+:[0-9]+$' % (2 * TEST_ID_BYTES))
@@ -407,7 +407,7 @@ class NATDetectionTest(nettest.NetTestCase):
         altRemotes = _unpackRemoteAddrs(self.localOptions['alt-remotes'] or '')
         tryUPnP = bool(self.localOptions['upnp'])
         maxSend = int(self.localOptions['max-send'])
-        sendInterval = int(self.localOptions['send-interval'])
+        sendInterval = float(self.localOptions['send-interval'])
 
         # Instantiate the protocol with the given options.
         testId = os.urandom(TEST_ID_BYTES).encode('hex')
