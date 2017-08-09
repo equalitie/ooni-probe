@@ -37,7 +37,7 @@ class _NATDetectionOptions(usage.Options):
         ['alt-remotes', 'R', None, "Comma-separated of IP:PORT addresses of source-only (alternate) remotes."],
     ]
 
-class _NatDetectionClient(protocol.DatagramProtocol):
+class _NATDetectionClient(protocol.DatagramProtocol):
     def __init__(self, testId, remotes, altRemotes=[], tryUPnP=False, maxSend=MAX_SEND_DEF):
         self.testId = testId
 
@@ -360,7 +360,7 @@ class NATDetectionTest(nettest.NetTestCase):
 
         # Instantiate the protocol with the given options.
         testId = os.urandom(TEST_ID_BYTES).encode('hex')
-        proto = _NatDetectionClient(testId, mainRemotes, altRemotes, tryUPnP=tryUPnP)
+        proto = _NATDetectionClient(testId, mainRemotes, altRemotes, tryUPnP=tryUPnP)
 
         def updateReport(result):
             rep = self.report
