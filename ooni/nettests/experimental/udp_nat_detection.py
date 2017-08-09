@@ -1,14 +1,19 @@
 import os
 
 from miniupnpc import UPnP
-from twisted.internet import defer, protocol, reactor
+from twisted.internet import defer, protocol, reactor, task
 from twisted.python import usage
 
 from ooni import nettest
 from ooni.utils import log
 
 
+"""Test identifier length (in bytes, double for hex)."""
 TEST_ID_BYTES = 8
+"""Default maximum number of times to send a message to a remote."""
+MAX_SEND_DEF = 10
+"""Interval between message sends (in seconds)."""
+SEND_INTERVAL_SECS = 5
 
 
 # Argument coercion functions are ignored by OONI.
@@ -27,8 +32,9 @@ class _NATDetectionOptions(usage.Options):
     ]
 
 class _NatDetectionClient(protocol.DatagramProtocol):
-    def __init__(self, testId, remotes, altRemotes=[], tryUPnP=False):
+    def __init__(self, testId, remotes, altRemotes=[], tryUPnP=False, maxSend=MAX_SEND_DEF):
         self.testId = testId
+        self._loopCalls = {}
 
         # Compute destination remotes and source remotes.
         self.dstRemotes = list(remotes)
@@ -41,6 +47,10 @@ class _NatDetectionClient(protocol.DatagramProtocol):
         self.tryUPnP = tryUPnP
         self._UPnP = None
         self._UPnPPort = None
+
+        self.maxSend = maxSend
+        self._sendCounter = {}
+        self._sendDone = 0
 
     def datagramReceived(self, data, addr):
         log.msg('RECV %s %s' % (addr, data))
@@ -59,15 +69,30 @@ class _NatDetectionClient(protocol.DatagramProtocol):
                     self._UPnP = upnp
                     self._UPnPPort = port  # transport not available on protocol stop
 
+        # Program periodic sends of datagrams to main remotes.
         for remote in self.dstRemotes:
-            message = 'NATDET ' + self.testId
-            log.msg('SEND %s %s' % (remote, message))
-            self.transport.write(message, remote)
+            self._sendCounter[remote] = 0
+            self._loopCalls[remote] = call = task.LoopingCall(self.sendMessage, remote)
+            call.start(SEND_INTERVAL_SECS, now=False)
 
     def stopProtocol(self):
+        # Stop periodic sends.
+        for call in self._loopCalls.values():
+            call.stop()
+
         # Remove the port mapping, if configured.
         if self._UPnP:
             self._UPnP.deleteportmapping(self._UPnPPort, 'UDP')
+
+    def sendMessage(self, remote):
+        message = 'NATDET ' + self.testId
+        log.msg('SEND %s %s' % (remote, message))
+        self.transport.write(message, remote)
+        self._sendCounter[remote] += 1
+        if self._sendCounter[remote] == self.maxSend:
+            self._sendDone += 1
+            if self._sendDone == len(self.dstRemotes):
+                self.deferred.callback('timeout')
 
 class NATDetectionTest(nettest.NetTestCase):
     """Basic NAT detection test using UDP.
@@ -263,8 +288,6 @@ class NATDetectionTest(nettest.NetTestCase):
 
     requiresRoot = False
     requiresTor = False
-
-    timeout = 5
 
     def testDummy(self):
         mainRemotes = _unpackRemoteAddrs(self.localOptions['remotes'])
