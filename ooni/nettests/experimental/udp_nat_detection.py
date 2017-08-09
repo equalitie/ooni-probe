@@ -85,18 +85,6 @@ def _guessNATType(flatReceived, mainRemotes, altRemotes):
     return '%s %s' % (mapping, filtering)
 
 
-class _NATDetectionOptions(usage.Options):
-    optFlags = [
-        ['upnp', 'u', "Attempt to establish a temporary port redirection using UPnP at the gateway."],
-    ]
-
-    optParameters = [
-        ['remotes', 'r', None, "Comma-separated of IP:PORT addresses of destination/source (main) remotes."],
-        ['alt-remotes', 'R', None, "Comma-separated of IP:PORT addresses of source-only (alternate) remotes."],
-        ['max-send', 'c', MAX_SEND_DEF, "Maximum number of times to send a message to a remote."],
-        ['send-interval', 'i', SEND_INTERVAL_SECS_DEF, "Interval between message sends (in seconds)."],
-    ]
-
 class _NATDetectionClient(protocol.DatagramProtocol):
     def __init__(self, testId, remotes, altRemotes=[],
                  tryUPnP=False, maxSend=MAX_SEND_DEF, sendInterval=SEND_INTERVAL_SECS_DEF):
@@ -402,7 +390,17 @@ class NATDetectionTest(nettest.NetTestCase):
                   "and alternate remotes in different ports or hosts than the main ones " \
                   "are needed for detection of filtering."
 
-    usageOptions = _NATDetectionOptions
+    class usageOptions(usage.Options):
+        optFlags = [
+            ['upnp', 'u', "Attempt to establish a temporary port redirection using UPnP at the gateway."],
+        ]
+
+        optParameters = [
+            ['remotes', 'r', None, "Comma-separated of IP:PORT addresses of destination/source (main) remotes."],
+            ['alt-remotes', 'R', None, "Comma-separated of IP:PORT addresses of source-only (alternate) remotes."],
+            ['max-send', 'c', MAX_SEND_DEF, "Maximum number of times to send a message to a remote."],
+            ['send-interval', 'i', SEND_INTERVAL_SECS_DEF, "Interval between message sends (in seconds)."],
+        ]
     requiredOptions = ['remotes']
 
     requiresRoot = False
