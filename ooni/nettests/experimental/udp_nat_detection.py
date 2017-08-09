@@ -187,13 +187,18 @@ class _NATDetectionClient(protocol.DatagramProtocol):
             self._UPnP.deleteportmapping(self._UPnPPort, 'UDP')
 
     def sendMessage(self, remote):
-        message = 'NATDET ' + self.testId
-        self.transport.write(message, remote)
+        # Did we already send all messages to this remote?
         self._sendCounter[remote] += 1
-        if self._sendCounter[remote] == self.maxSend:
+        if self._sendCounter[remote] > self.maxSend:
             self._sendDone += 1
+            # And to the rest of remotes?
             if self._sendDone == len(self.dstRemotes):
                 self.deferred.callback('timeout')
+            return
+        # If not, send the message again.
+        message = 'NATDET ' + self.testId
+        self.transport.write(message, remote)
+        # This will be called once more to give remotes time to reply to this message.
 
 class NATDetectionTest(nettest.NetTestCase):
     """Basic NAT detection test using UDP.
