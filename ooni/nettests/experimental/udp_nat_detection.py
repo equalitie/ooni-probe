@@ -211,7 +211,9 @@ class NATDetectionTest(nettest.NetTestCase):
     both by contacting specific remote transport addresses via UDP to infer
     the type of *NAT mapping*, as well as receiving UDP traffic from other
     remote transport addresses not contacted before to infer the type of *NAT
-    filtering*.
+    filtering*.  Since sent or received traffic may be lost for many reasons
+    not related with NAT, the test is careful to only report facts that can be
+    derived from the received traffic and not from its absence.
 
     It simply sends UDP messages to the given main remotes, until it receives
     a reply back from all of them (plus the given alternate remotes) or gives
@@ -349,8 +351,8 @@ class NATDetectionTest(nettest.NetTestCase):
 
     The detected NAT type is reported as ``'map:TYPE filter:TYPE'``.
 
-    The NAT mapping is reported as either ``'map:addr-or-port-dep'`` or
-    ``'map:endpoint-indep'``.  If traffic from some main remote is not
+    The NAT mapping is reported as either ``'map:endpoint-indep'`` or
+    ``'map:addr-or-port-dep'``.  If traffic from some main remote is not
     received, ``'map:uncertain'`` is reported since there is not enough
     information to decide.
 
