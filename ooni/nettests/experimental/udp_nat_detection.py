@@ -11,6 +11,8 @@ This can be completed for instance with
 * Server 1 listening on 127.0.0.1:12345, 127.0.0.1:12346, 127.0.0.3:13579
 * Server 2 listening on 127.0.0.2:54321
 
+Note: This code has not been tested in a mixed IPv4/IPv6 environment.
+
 See the documentation of the `NATDetectionTest` class for more information.
 """
 
@@ -39,9 +41,12 @@ _max_data_len = len('NATDET %s [0123:4567:89ab:cdef:fedc:ba98:7654:3210]:65535' 
 
 
 # Argument coercion functions are ignored by OONI.
+def _unpackAddr(a):
+    (hs, ps) = a.rsplit(':', 1)
+    return (hs.translate(None, '[]'), int(ps))  # remove IPv6 brackets, convert port to integer
+
 def _unpackRemoteAddrs(s):
-    return [(h.translate(None, '[]'), int(p))  # remove IPv6 brackets, convert port to integer
-            for (h, p) in (a.rsplit(':', 1) for a in s.split(',') if s)]  # split on comma, then on colon
+    return [_unpackAddr(a) for a in s.split(',') if s]
 
 def _flattenReceived(proto):
     """A flattened view of the datagrams received by the `proto`.
@@ -55,34 +60,54 @@ def _flattenReceived(proto):
         key=(lambda dg: (dg['time_first'], dg['source_addr']))
     )
 
-def _guessNATType(flatReceived, mainRemotes, altRemotes):
+def _guessNATType(myLocalAddr, flatReceived, mainRemotes, altRemotes):
     """Attempt to identify the type of NAT as ``'map:TYPE filter:TYPE'``."""
     validMsgs = [m for m in flatReceived if m['probe_decision'].startswith('valid')]
 
-    # Did we receive messages from all main remotes?
     validSrcs = set((m['source_addr']['host'], m['source_addr']['port']) for m in validMsgs)
+    myPubAddrs = set(_unpackAddr(m['data'].split()[2]) for m in validMsgs)
+    # Did we receive messages from all main remotes?
     if set(mainRemotes) - validSrcs:
-        mapping = 'map:uncertain'  # insufficient information
+        mapping = 'uncertain'  # insufficient information
     # Did remotes report different source addresses from us?
-    elif len(set(m['data'].split()[2] for m in validMsgs)) > 1:
-        mapping = 'map:addr-or-port-dep'  # different destinations get a different source port
+    elif len(myPubAddrs) > 1:
+        mapping = 'addr-or-port-dep'  # different destinations get a different source port
+    # Dir remotes report a single address different than the local one?
+    elif myPubAddrs != set([myLocalAddr]):
+        mapping = 'endpoint-indep'  # all destination get the same address
     else:
-        mapping = 'map:endpoint-indep'  # all remotes reported the same address
+        mapping = 'none'  # no NAT detected
 
     # Did we get messages from alternate remotes...
     validMsgTypes = set(m['probe_decision'] for m in validMsgs)
     # ... with a host address not among main remotes?
     if 'valid_althost' in validMsgTypes:
-        filtering = 'filter:endpoint-indep'  # address-independent filter (assume port-independent as per RFC)
+        filtering = 'endpoint-indep'  # address-independent filter (assume port-independent as per RFC)
     # ... with a host address among main remotes?
     elif 'valid_altport' in validMsgTypes:
-        filtering = 'filter:port-indep'  # port-independent
+        filtering = 'port-indep'  # port-independent
     elif altRemotes:
-        filtering = 'filter:probable'  # no messages from existing alternate remotes
+        filtering = 'probable'  # no messages from existing alternate remotes
     else:
-        filtering = 'filter:ignored'  # can not tell whether there is filtering or not
+        filtering = 'ignored'  # can not tell whether there is filtering or not
 
-    return '%s %s' % (mapping, filtering)
+    return 'map:%s filter:%s' % (mapping, filtering)
+
+
+class _LocalAddressDetector(protocol.DatagramProtocol):
+    """A trivial protocol to help detect the main local host address.
+
+    It does nothing but connect on start to the discard service port of the
+    host address given in the constructor so that the local address can be
+    retrieved afterwards from the protocol's transport.
+
+    The protocol can then be stopped.
+    """
+    def __init__(self, remoteHost):
+        self.remoteHost = remoteHost
+
+    def startProtocol(self):
+        self.transport.connect(self.remoteHost, 9)
 
 
 class _NATDetectionClient(protocol.DatagramProtocol):
@@ -256,9 +281,9 @@ class NATDetectionTest(nettest.NetTestCase):
     ``test_id``
       The 16 hexadecimal digits used as test identifier (string).
 
-    ``source_port``
-      The source UDP port of test datagrams, as seen by the test itself
-      (number).
+    ``source_addr``
+      The source transport address of test datagrams, as seen by the test
+      itself (object with members ``host`` (string) and ``port`` (number)).
 
     ``remotes``
       The transport addresses of the given main remotes (array of objects with
@@ -351,20 +376,20 @@ class NATDetectionTest(nettest.NetTestCase):
 
     The detected NAT type is reported as ``'map:TYPE filter:TYPE'``.
 
-    The NAT mapping is reported as either ``'map:endpoint-indep'`` or
-    ``'map:addr-or-port-dep'``.  If traffic from some main remote is not
-    received, ``'map:uncertain'`` is reported since there is not enough
-    information to decide.
+    The NAT mapping is reported as either ``map:endpoint-indep`` or
+    ``map:addr-or-port-dep``.  If traffic from some main remote is not
+    received, ``map:uncertain`` is reported since there is not enough
+    information to decide.  If no NAT is detected (e.g. when the probe uses an
+    untranslated, public IP address), ``map:none`` is reported.
 
     If traffic from alternate remotes is received, the NAT filtering is
-    reported as either ``'filter:endpoint-indep'`` or ``'filter:port-indep'``
-    to indicate that the absence of address-dependent or port-dependent
-    filtering was detected.  If alternate remotes were specified but no
-    traffic was received from them, ``'filter:probable'`` is reported (maybe
-    the NAT does filtering or maybe their messages got blocked for other
-    reasons).  If no alternate remotes were specified, ``'filter:ignored'`` is
-    reported since there is no way to identify address-dependent or
-    port-dependent filtering.
+    reported as either ``filter:endpoint-indep`` or ``filter:port-indep``  to
+    indicate that the absence of address-dependent or port-dependent filtering
+    was detected.  If alternate remotes were specified but no traffic was
+    received from them, ``filter:probable`` is reported (maybe the NAT does
+    filtering or maybe their messages got blocked for other reasons).  If no
+    alternate remotes were specified, ``filter:ignored`` is reported since
+    there is no way to identify address-dependent or port-dependent filtering.
 
     Examples:
 
@@ -425,17 +450,28 @@ class NATDetectionTest(nettest.NetTestCase):
         proto = _NATDetectionClient(testId, mainRemotes, altRemotes,
                                     tryUPnP=tryUPnP, maxSend=maxSend, sendInterval=sendInterval)
 
+        # Detect the local host address.
+        sourceHosts = set()
+        for (rHost, rPort) in mainRemotes:
+            lp = reactor.listenUDP(0, _LocalAddressDetector(rHost))
+            sourceHosts.add(lp.getHost().host)
+            lp.stopListening()
+        if len(sourceHosts) > 1:
+            raise ValueError("main remotes must be reachable from the same local host address")
+        sourceHost = sourceHosts.pop()
+
         def updateReport(result):
             rep = self.report
             rep['test_id'] = testId
-            rep['source_port'] = sourcePort
+            rep['source_addr'] = {'host': sourceHost, 'port': sourcePort}
             rep['remotes'] = [{'host': h, 'port': p} for (h, p) in mainRemotes]
             rep['alt_remotes'] = [{'host': h, 'port': p} for (h, p) in altRemotes]
             rep['max_send'] = maxSend
             rep['send_interval'] = sendInterval
             rep['upnp_active'] = proto.isUPnPActive()
             rep['data_received'] = flatReceived = _flattenReceived(proto)
-            rep['nat_type'] = _guessNATType(flatReceived, mainRemotes, altRemotes)
+            rep['nat_type'] = _guessNATType((sourceHost, sourcePort),
+                                            flatReceived, mainRemotes, altRemotes)
 
         deferred = defer.Deferred()
         deferred.addCallback(updateReport)
