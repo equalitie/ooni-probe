@@ -447,10 +447,14 @@ class NATDetectionTest(nettest.NetTestCase):
                                     tryUPnP=tryUPnP, maxSend=maxSend, sendInterval=sendInterval)
 
         # Detect the local host address.
-        addrDetProto = _LocalAddressDetector(mainRemotes[0][0])  # host address of first main remote
-        lp = reactor.listenUDP(0, addrDetProto)
-        sourceHost = lp.getHost().host
-        lp.stopListening()
+        sourceHosts = set()
+        for (rHost, rPort) in mainRemotes:
+            lp = reactor.listenUDP(0, _LocalAddressDetector(rHost))
+            sourceHosts.add(lp.getHost().host)
+            lp.stopListening()
+        if len(sourceHosts) > 1:
+            raise ValueError("main remotes must be reachable from the same local host address")
+        sourceHost = sourceHosts.pop()
 
         def updateReport(result):
             rep = self.report
