@@ -89,6 +89,22 @@ def _guessNATType(myLocalAddr, flatReceived, mainRemotes, altRemotes):
     return '%s %s' % (mapping, filtering)
 
 
+class _LocalAddressDetector(protocol.DatagramProtocol):
+    """A trivial protocol to help detect the main local host address.
+
+    It does nothing but connect on start to the discard service port of the
+    host address given in the constructor so that the local address can be
+    retrieved afterwards from the protocol's transport.
+
+    The protocol can then be stopped.
+    """
+    def __init__(self, remoteHost):
+        self.remoteHost = remoteHost
+
+    def startProtocol(self):
+        self.transport.connect(self.remoteHost, 9)
+
+
 class _NATDetectionClient(protocol.DatagramProtocol):
     def __init__(self, testId, remotes, altRemotes=[],
                  tryUPnP=False, maxSend=MAX_SEND_DEF, sendInterval=SEND_INTERVAL_SECS_DEF):
@@ -260,9 +276,9 @@ class NATDetectionTest(nettest.NetTestCase):
     ``test_id``
       The 16 hexadecimal digits used as test identifier (string).
 
-    ``source_port``
-      The source UDP port of test datagrams, as seen by the test itself
-      (number).
+    ``source_addr``
+      The source transport address of test datagrams, as seen by the test
+      itself (object with members ``host`` (string) and ``port`` (number)).
 
     ``remotes``
       The transport addresses of the given main remotes (array of objects with
@@ -430,10 +446,16 @@ class NATDetectionTest(nettest.NetTestCase):
         proto = _NATDetectionClient(testId, mainRemotes, altRemotes,
                                     tryUPnP=tryUPnP, maxSend=maxSend, sendInterval=sendInterval)
 
+        # Detect the local host address.
+        addrDetProto = _LocalAddressDetector(mainRemotes[0][0])  # host address of first main remote
+        lp = reactor.listenUDP(0, addrDetProto)
+        sourceHost = lp.getHost().host
+        lp.stopListening()
+
         def updateReport(result):
             rep = self.report
             rep['test_id'] = testId
-            rep['source_port'] = sourcePort
+            rep['source_addr'] = {'host': sourceHost, 'port': sourcePort}
             rep['remotes'] = [{'host': h, 'port': p} for (h, p) in mainRemotes]
             rep['alt_remotes'] = [{'host': h, 'port': p} for (h, p) in altRemotes]
             rep['max_send'] = maxSend
@@ -447,6 +469,5 @@ class NATDetectionTest(nettest.NetTestCase):
         deferred.addCallback(updateReport)
         proto.deferred = deferred
         lp = reactor.listenUDP(0, proto)
-        sourceHost = lp.getHost().host  # XXXX fix detection
         sourcePort = lp.getHost().port
         return deferred
