@@ -39,6 +39,10 @@ _max_data_len = len('NATDET %s [0123:4567:89ab:cdef:fedc:ba98:7654:3210]:65535' 
 
 
 # Argument coercion functions are ignored by OONI.
+def _unpackAddr(a):
+    (hs, ps) = a.rsplit(':', 1)
+    return (hs.translate(None, '[]'), int(ps))  # remove IPv6 brackets, convert port to integer
+
 def _unpackRemoteAddrs(s):
     return [(h.translate(None, '[]'), int(p))  # remove IPv6 brackets, convert port to integer
             for (h, p) in (a.rsplit(':', 1) for a in s.split(',') if s)]  # split on comma, then on colon
@@ -60,7 +64,7 @@ def _guessNATType(myLocalAddr, flatReceived, mainRemotes, altRemotes):
     validMsgs = [m for m in flatReceived if m['probe_decision'].startswith('valid')]
 
     validSrcs = set((m['source_addr']['host'], m['source_addr']['port']) for m in validMsgs)
-    myPubAddrs = set(m['data'].split()[2] for m in validMsgs)
+    myPubAddrs = set(_unpackAddr(m['data'].split()[2]) for m in validMsgs)
     # Did we receive messages from all main remotes?
     if set(mainRemotes) - validSrcs:
         mapping = 'map:uncertain'  # insufficient information
