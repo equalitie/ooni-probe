@@ -68,30 +68,30 @@ def _guessNATType(myLocalAddr, flatReceived, mainRemotes, altRemotes):
     myPubAddrs = set(_unpackAddr(m['data'].split()[2]) for m in validMsgs)
     # Did we receive messages from all main remotes?
     if set(mainRemotes) - validSrcs:
-        mapping = 'map:uncertain'  # insufficient information
+        mapping = 'uncertain'  # insufficient information
     # Did remotes report different source addresses from us?
     elif len(myPubAddrs) > 1:
-        mapping = 'map:addr-or-port-dep'  # different destinations get a different source port
+        mapping = 'addr-or-port-dep'  # different destinations get a different source port
     # Dir remotes report a single address different than the local one?
     elif myPubAddrs != set([myLocalAddr]):
-        mapping = 'map:endpoint-indep'  # all destination get the same address
+        mapping = 'endpoint-indep'  # all destination get the same address
     else:
-        mapping = 'map:none'  # no NAT detected
+        mapping = 'none'  # no NAT detected
 
     # Did we get messages from alternate remotes...
     validMsgTypes = set(m['probe_decision'] for m in validMsgs)
     # ... with a host address not among main remotes?
     if 'valid_althost' in validMsgTypes:
-        filtering = 'filter:endpoint-indep'  # address-independent filter (assume port-independent as per RFC)
+        filtering = 'endpoint-indep'  # address-independent filter (assume port-independent as per RFC)
     # ... with a host address among main remotes?
     elif 'valid_altport' in validMsgTypes:
-        filtering = 'filter:port-indep'  # port-independent
+        filtering = 'port-indep'  # port-independent
     elif altRemotes:
-        filtering = 'filter:probable'  # no messages from existing alternate remotes
+        filtering = 'probable'  # no messages from existing alternate remotes
     else:
-        filtering = 'filter:ignored'  # can not tell whether there is filtering or not
+        filtering = 'ignored'  # can not tell whether there is filtering or not
 
-    return '%s %s' % (mapping, filtering)
+    return 'map:%s filter:%s' % (mapping, filtering)
 
 
 class _LocalAddressDetector(protocol.DatagramProtocol):
