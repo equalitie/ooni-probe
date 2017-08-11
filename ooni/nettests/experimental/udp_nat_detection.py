@@ -11,6 +11,8 @@ This can be completed for instance with
 * Server 1 listening on 127.0.0.1:12345, 127.0.0.1:12346, 127.0.0.3:13579
 * Server 2 listening on 127.0.0.2:54321
 
+Note: This code has not been tested in a mixed IPv4/IPv6 environment.
+
 See the documentation of the `NATDetectionTest` class for more information.
 """
 
