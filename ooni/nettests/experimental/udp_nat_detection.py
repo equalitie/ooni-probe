@@ -44,8 +44,7 @@ def _unpackAddr(a):
     return (hs.translate(None, '[]'), int(ps))  # remove IPv6 brackets, convert port to integer
 
 def _unpackRemoteAddrs(s):
-    return [(h.translate(None, '[]'), int(p))  # remove IPv6 brackets, convert port to integer
-            for (h, p) in (a.rsplit(':', 1) for a in s.split(',') if s)]  # split on comma, then on colon
+    return [_unpackAddr(a) for a in s.split(',') if s]
 
 def _flattenReceived(proto):
     """A flattened view of the datagrams received by the `proto`.
