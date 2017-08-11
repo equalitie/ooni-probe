@@ -376,21 +376,20 @@ class NATDetectionTest(nettest.NetTestCase):
 
     The detected NAT type is reported as ``'map:TYPE filter:TYPE'``.
 
-    The NAT mapping is reported as either ``'map:endpoint-indep'`` or
-    ``'map:addr-or-port-dep'``.  If traffic from some main remote is not
-    received, ``'map:uncertain'`` is reported since there is not enough
+    The NAT mapping is reported as either ``map:endpoint-indep`` or
+    ``map:addr-or-port-dep``.  If traffic from some main remote is not
+    received, ``map:uncertain`` is reported since there is not enough
     information to decide.  If no NAT is detected (e.g. when the probe uses an
-    untranslated, public IP address), ``'map:none'`` is reported.
+    untranslated, public IP address), ``map:none`` is reported.
 
     If traffic from alternate remotes is received, the NAT filtering is
-    reported as either ``'filter:endpoint-indep'`` or ``'filter:port-indep'``
-    to indicate that the absence of address-dependent or port-dependent
-    filtering was detected.  If alternate remotes were specified but no
-    traffic was received from them, ``'filter:probable'`` is reported (maybe
-    the NAT does filtering or maybe their messages got blocked for other
-    reasons).  If no alternate remotes were specified, ``'filter:ignored'`` is
-    reported since there is no way to identify address-dependent or
-    port-dependent filtering.
+    reported as either ``filter:endpoint-indep`` or ``filter:port-indep``  to
+    indicate that the absence of address-dependent or port-dependent filtering
+    was detected.  If alternate remotes were specified but no traffic was
+    received from them, ``filter:probable`` is reported (maybe the NAT does
+    filtering or maybe their messages got blocked for other reasons).  If no
+    alternate remotes were specified, ``filter:ignored`` is reported since
+    there is no way to identify address-dependent or port-dependent filtering.
 
     Examples:
 
