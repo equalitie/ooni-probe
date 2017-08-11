@@ -55,19 +55,23 @@ def _flattenReceived(proto):
         key=(lambda dg: (dg['time_first'], dg['source_addr']))
     )
 
-def _guessNATType(flatReceived, mainRemotes, altRemotes):
+def _guessNATType(myLocalAddr, flatReceived, mainRemotes, altRemotes):
     """Attempt to identify the type of NAT as ``'map:TYPE filter:TYPE'``."""
     validMsgs = [m for m in flatReceived if m['probe_decision'].startswith('valid')]
 
-    # Did we receive messages from all main remotes?
     validSrcs = set((m['source_addr']['host'], m['source_addr']['port']) for m in validMsgs)
+    myPubAddrs = set(m['data'].split()[2] for m in validMsgs)
+    # Did we receive messages from all main remotes?
     if set(mainRemotes) - validSrcs:
         mapping = 'map:uncertain'  # insufficient information
     # Did remotes report different source addresses from us?
-    elif len(set(m['data'].split()[2] for m in validMsgs)) > 1:
+    elif len(myPubAddrs) > 1:
         mapping = 'map:addr-or-port-dep'  # different destinations get a different source port
+    # Dir remotes report a single address different than the local one?
+    elif myPubAddrs != set([myLocalAddr]):
+        mapping = 'map:endpoint-indep'  # all destination get the same address
     else:
-        mapping = 'map:endpoint-indep'  # all remotes reported the same address
+        mapping = 'map:none'  # no NAT detected
 
     # Did we get messages from alternate remotes...
     validMsgTypes = set(m['probe_decision'] for m in validMsgs)
@@ -354,7 +358,8 @@ class NATDetectionTest(nettest.NetTestCase):
     The NAT mapping is reported as either ``'map:endpoint-indep'`` or
     ``'map:addr-or-port-dep'``.  If traffic from some main remote is not
     received, ``'map:uncertain'`` is reported since there is not enough
-    information to decide.
+    information to decide.  If no NAT is detected (e.g. when the probe uses an
+    untranslated, public IP address), ``'map:none'`` is reported.
 
     If traffic from alternate remotes is received, the NAT filtering is
     reported as either ``'filter:endpoint-indep'`` or ``'filter:port-indep'``
@@ -435,11 +440,13 @@ class NATDetectionTest(nettest.NetTestCase):
             rep['send_interval'] = sendInterval
             rep['upnp_active'] = proto.isUPnPActive()
             rep['data_received'] = flatReceived = _flattenReceived(proto)
-            rep['nat_type'] = _guessNATType(flatReceived, mainRemotes, altRemotes)
+            rep['nat_type'] = _guessNATType((sourceHost, sourcePort),
+                                            flatReceived, mainRemotes, altRemotes)
 
         deferred = defer.Deferred()
         deferred.addCallback(updateReport)
         proto.deferred = deferred
         lp = reactor.listenUDP(0, proto)
+        sourceHost = lp.getHost().host  # XXXX fix detection
         sourcePort = lp.getHost().port
         return deferred
