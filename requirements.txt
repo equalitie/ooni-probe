@@ -18,4 +18,4 @@ pydumbnet
 zope.interface
 certifi
 klein
-miniupnpc
+miniupnpc==1.9
