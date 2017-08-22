@@ -1,4 +1,4 @@
-from twisted.internet import reactor, utils
+from twisted.internet import defer, reactor, utils
 from twisted.internet.error import ConnectionRefusedError
 from ooni.common.ip_utils import is_private_address
 from ooni.utils import log
@@ -142,10 +142,11 @@ class PeerLocator(tcpt.TCPTest):
                 log.msg("exceeded retries for running an HTTP server")
                 return communicate(0, behind_nat)
 
-            def handleServerStart(proc, http_server_port):
-                #the server is running (or less probably too slow to start)
-                proc.cancel()  #do not wait for its exit
-                return communicate(http_server_port, behind_nat)
+            def handleServerRunning(failure):
+                if isinstance(failure.value, defer.CancelledError):
+                    #the server is running (or less probably too slow to start)
+                    return communicate(http_server_port, behind_nat)
+                return failure
 
             def handleServerExit(proc_ret):
                 proc._tout.cancel()  #cancel timeout trigger
@@ -175,8 +176,8 @@ class PeerLocator(tcpt.TCPTest):
                                 '--port', http_server_port,
                                 '--upnp' if behind_nat else '--noupnp'],
                 env=os.environ)
-            proc._tout = reactor.callLater(5, handleServerStart, proc, http_server_port)  #wait for start or crash
-            proc.addCallback(handleServerExit)
+            proc._tout = reactor.callLater(5, lambda p: p.cancel(), proc)  #wait for start or crash
+            proc.addCallbacks(handleServerExit, handleServerRunning)
             return proc
 
         return start_server_and_communicate(http_server_port, 10)
