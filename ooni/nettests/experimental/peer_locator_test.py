@@ -154,15 +154,20 @@ class PeerLocator(tcpt.TCPTest):
 
                 if proc_ret == 2 and not random_port:  #the forced port was busy
                     log.msg("failed to bind to requested port %s" % http_server_port)
-                    return communicate(0, behind_nat)
-                if proc_ret == 4:  #UPnP not available
+                    retry = False
+                elif proc_ret == 4:  #UPnP not available
                     log.msg("UPnP is not available, can not map port")
-                    return communicate(0, behind_nat)
+                    retry = False
+                elif proc_ret == 3 and not random_port:  #issues with UPnP port mapping
+                    log.msg("failed to map port using UPnP, retrying")
+                    retry = True
+                else:
+                    log.msg("unknown error %d from http server, retrying" % proc_ret)
+                    retry = True
 
-                if proc_ret == 3 and not random_port:  #issues with UPnP port mapping
-                    log.msg("failed to map port using UPnP")
-                #retry with another port
-                return start_server_and_communicate(http_server_port, remainingTries-1)
+                if retry:  #retry with another port
+                    return start_server_and_communicate(http_server_port, remainingTries-1)
+                return communicate(0, behind_nat)  #proceed to query-only mode
 
             def handleServerRunning(failure):
                 if isinstance(failure.value, defer.CancelledError):
