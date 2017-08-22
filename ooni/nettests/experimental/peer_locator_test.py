@@ -142,11 +142,11 @@ class PeerLocator(tcpt.TCPTest):
                 log.msg("exceeded retries for running an HTTP server")
                 return communicate(0, behind_nat)
 
-            def handleServerRunning(failure):
-                if isinstance(failure.value, defer.CancelledError):
-                    #the server is running (or less probably too slow to start)
-                    return communicate(http_server_port, behind_nat)
-                return failure
+            if random_port:  #get random port (with 50% probability for port 80)
+                if (random.randint(0,1) == 0):
+                    http_server_port =  '80'
+                else:
+                    http_server_port = str(random.randint(1025, 65535))
 
             def handleServerExit(proc_ret):
                 proc._tout.cancel()  #cancel timeout trigger
@@ -164,11 +164,11 @@ class PeerLocator(tcpt.TCPTest):
                 #retry with another port
                 return start_server_and_communicate(http_server_port, remainingTries-1)
 
-            if random_port:  #get random port (with 50% probability for port 80)
-                if (random.randint(0,1) == 0):
-                    http_server_port =  '80'
-                else:
-                    http_server_port = str(random.randint(1025, 65535))
+            def handleServerRunning(failure):
+                if isinstance(failure.value, defer.CancelledError):
+                    #the server is running (or less probably too slow to start)
+                    return communicate(http_server_port, behind_nat)
+                return failure
 
             log.msg("running an http server on port %s"%http_server_port)
             proc = utils.getProcessValue(
