@@ -85,11 +85,11 @@ class PeerLocator(tcpt.TCPTest):
     requiredTestHelpers = {'backend': 'peer_locator_helper'}
     
     def test_peer_locator(self):
-        def communicate(http_server_port, is_server_running, behind_nat):
+        def communicate(http_server_port, behind_nat):
             self.address, self.port = self.localOptions['backend'].split(":")
             self.port = int(self.port)
             # HTTP server port, protocol and flags.
-            payload = '%s HTTP' % (http_server_port if is_server_running else 0)
+            payload = '%s HTTP' % http_server_port
             payload += ' nat' if behind_nat else ' nonat'
             d = self.sendPayload(payload)
             d.addErrback(connection_failed)
@@ -167,4 +167,4 @@ class PeerLocator(tcpt.TCPTest):
             #fail, do not report a failed port or a port not used by us
             log.msg("exceeded retries for running an HTTP server")
 
-        return communicate(http_server_port, is_server_running, behind_nat)
+        return communicate(http_server_port if is_server_running else 0, behind_nat)
