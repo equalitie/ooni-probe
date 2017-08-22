@@ -92,8 +92,8 @@ class PeerLocator(tcpt.TCPTest):
             payload = '%s HTTP' % http_server_port
             payload += ' nat' if behind_nat else ' nonat'
             d = self.sendPayload(payload)
-            d.addErrback(connection_failed)
             d.addCallback(got_response)
+            d.addErrback(connection_failed)
             return d
 
         def got_response(response):
