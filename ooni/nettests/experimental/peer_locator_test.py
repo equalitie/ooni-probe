@@ -18,6 +18,13 @@ import urllib
 
 from contextlib import closing
 
+MAX_SERVER_RETRIES = 10
+"""Maximum number of times to try to start the HTTP server."""
+
+SERVER_RUNNING_AFTER_SECS = 5
+"""Seconds after which the HTTP server is considered to be running."""
+
+
 # Accept ``SECS.DEC IP:PORT PROTO [FLAG...]`` from peer locator helper.
 _max_data_len = 100
 _data_re = re.compile(r'^[0-9]+\.[0-9]+ [\[\].:0-9a-f]+:[0-9]+ [A-Z]+( |( [_a-z]+)+)$')
@@ -181,8 +188,9 @@ class PeerLocator(tcpt.TCPTest):
                                 '--port', http_server_port,
                                 '--upnp' if behind_nat else '--noupnp'],
                 env=os.environ)
-            proc._tout = reactor.callLater(5, lambda p: p.cancel(), proc)  #wait for start or crash
+            proc._tout = reactor.callLater(  #wait for start or crash
+                SERVER_RUNNING_AFTER_SECS, lambda p: p.cancel(), proc)
             proc.addCallbacks(handleServerExit, handleServerRunning)
             return proc
 
-        return start_server_and_communicate(http_server_port, 10)
+        return start_server_and_communicate(http_server_port, MAX_SERVER_RETRIES)
