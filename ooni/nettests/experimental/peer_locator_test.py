@@ -92,6 +92,10 @@ class PeerLocator(tcpt.TCPTest):
 
     usageOptions = UsageOptions
     requiredTestHelpers = {'backend': 'peer_locator_helper'}
+
+    # Do not time out before we are done trying to start the server
+    # (it causes a ``CancelledError``).
+    timeout = int(MAX_SERVER_RETRIES * SERVER_RUNNING_AFTER_SECS * 1.25)
     
     def test_peer_locator(self):
         def communicate(http_server_port, behind_nat):
