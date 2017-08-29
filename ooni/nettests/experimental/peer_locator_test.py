@@ -160,6 +160,10 @@ class PeerLocator(tcpt.TCPTest):
                     http_server_port = str(random.randint(1025, 65535))
 
             def handleServerExit(proc_ret):
+                if proc_ret is None:
+                    #process monitoring cancelled, process running, tell helper
+                    return communicate(http_server_port, behind_nat)
+
                 proc._tout.cancel()  #cancel timeout trigger
                 proc._tout = None
 
@@ -183,7 +187,7 @@ class PeerLocator(tcpt.TCPTest):
             def handleServerRunning(failure):
                 if isinstance(failure.value, defer.CancelledError):
                     #the server is running (or less probably too slow to start)
-                    return communicate(http_server_port, behind_nat)
+                    return
                 return failure
 
             log.msg("running an http server on port %s"%http_server_port)
@@ -194,7 +198,8 @@ class PeerLocator(tcpt.TCPTest):
                 env=os.environ)
             proc._tout = reactor.callLater(  #wait for start or crash
                 SERVER_RUNNING_AFTER_SECS, lambda p: p.cancel(), proc)
-            proc.addCallbacks(handleServerExit, handleServerRunning)
+            proc.addErrback(handleServerRunning)
+            proc.addCallback(handleServerExit)
             return proc
 
         return start_server_and_communicate(http_server_port, MAX_SERVER_RETRIES)
