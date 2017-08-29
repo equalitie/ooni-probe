@@ -159,13 +159,12 @@ class PeerLocator(tcpt.TCPTest):
                 else:
                     http_server_port = str(random.randint(1025, 65535))
 
-            def handleServerExit(proc_ret):
+            def handleServerExit(proc_ret, tout):
                 if proc_ret is None:
                     #process monitoring cancelled, process running, tell helper
                     return communicate(http_server_port, behind_nat)
 
-                proc._tout.cancel()  #cancel timeout trigger
-                proc._tout = None
+                tout.cancel()  #cancel timeout trigger
 
                 if proc_ret == 2 and not random_port:  #the forced port was busy
                     log.msg("failed to bind to requested port %s" % http_server_port)
@@ -196,10 +195,10 @@ class PeerLocator(tcpt.TCPTest):
                                 '--port', http_server_port,
                                 '--upnp' if behind_nat else '--noupnp'],
                 env=os.environ)
-            proc._tout = reactor.callLater(  #wait for start or crash
+            tout = reactor.callLater(  #wait for start or crash
                 SERVER_RUNNING_AFTER_SECS, lambda p: p.cancel(), proc)
             proc.addErrback(handleServerRunning)
-            proc.addCallback(handleServerExit)
+            proc.addCallback(handleServerExit, tout)
             return proc
 
         return start_server_and_communicate(http_server_port, MAX_SERVER_RETRIES)
