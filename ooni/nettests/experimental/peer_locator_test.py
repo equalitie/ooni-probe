@@ -18,10 +18,10 @@ import urllib
 
 from contextlib import closing
 
-MAX_SERVER_RETRIES = 10
+MAX_HTTP_SERVER_RETRIES = 10
 """Maximum number of times to try to start the HTTP server."""
 
-SERVER_RUNNING_AFTER_SECS = 5
+HTTP_SERVER_RUNNING_AFTER_SECS = 5
 """Seconds after which the HTTP server is considered to be running."""
 
 
@@ -65,11 +65,16 @@ def get_my_public_ip():
             continue
     return None  # no valid address found
 
+
+_allowed_protocols = {'http': 'HTTP'}
+
 class UsageOptions(usage.Options):
     optParameters = [['backend', 'b', '127.0.0.1:57007',
                       'URL of the test backend to use'],
                       ['peer_list', 'p', 'var/peer_list.txt',
                        'name of the file which stores the address of the peer'],
+                     ['protocol', 'P', None,
+                      'the protocol to report and locate peers for: ' + ', '.join(_allowed_protocols)],
                      ['http_port', 't', '80',
                       'the port number where the http server is running on ']
     
@@ -88,21 +93,27 @@ class PeerLocator(tcpt.TCPTest):
     usageOptions = UsageOptions
     requiresTor = False
     requiresRoot = False
-    requiredOptions = ['backend']
+    requiredOptions = ['backend', 'protocol']
 
     usageOptions = UsageOptions
     requiredTestHelpers = {'backend': 'peer_locator_helper'}
 
     # Do not time out before we are done trying to start the server
     # (it causes a ``CancelledError`` in ``ooni.tasks.Measurement``).
-    timeout = int(MAX_SERVER_RETRIES * SERVER_RUNNING_AFTER_SECS * 1.25)
+    timeout = int(MAX_HTTP_SERVER_RETRIES * HTTP_SERVER_RUNNING_AFTER_SECS * 1.25)
     
     def test_peer_locator(self):
-        def communicate(http_server_port, behind_nat):
+        # Post options does not work in OONI, check by hand.
+        try:
+            service_proto = _allowed_protocols[self.localOptions['protocol']]
+        except KeyError as ke:
+            raise usage.UsageError("invalid protocol: %s" % ke.args[0])
+
+        def communicate(service_port, behind_nat):
             self.address, self.port = self.localOptions['backend'].split(":")
             self.port = int(self.port)
-            # HTTP server port, protocol and flags.
-            payload = '%s HTTP' % http_server_port
+            # service port, protocol and flags.
+            payload = '%s %s' % (service_port, service_proto)
             payload += ' nat' if behind_nat else ' nonat'
             d = self.sendPayload(payload)
             d.addCallback(got_response)
@@ -196,9 +207,9 @@ class PeerLocator(tcpt.TCPTest):
                                 '--upnp' if behind_nat else '--noupnp'],
                 env=os.environ)
             tout = reactor.callLater(  #wait for start or crash
-                SERVER_RUNNING_AFTER_SECS, lambda p: p.cancel(), proc)
+                HTTP_SERVER_RUNNING_AFTER_SECS, lambda p: p.cancel(), proc)
             proc.addErrback(handleServerRunning)
             proc.addCallback(handleServerExit, tout)
             return proc
 
-        return start_server_and_communicate(http_server_port, MAX_SERVER_RETRIES)
+        return start_server_and_communicate(http_server_port, MAX_HTTP_SERVER_RETRIES)
