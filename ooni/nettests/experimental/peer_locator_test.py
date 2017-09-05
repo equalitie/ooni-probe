@@ -82,8 +82,8 @@ class PeerLocator(tcpt.TCPTest):
     so we can run web connectivity to them. 
     """
     name = "Peer Locator"
-    version = "0.2"
-    authors = "vmon"
+    version = "0.3"
+    authors = "vmon, ivilata"
 
     usageOptions = UsageOptions
     requiresTor = False
