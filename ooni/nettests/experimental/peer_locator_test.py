@@ -1,3 +1,4 @@
+from twisted.internet import defer, reactor, utils
 from twisted.internet.error import ConnectionRefusedError
 from ooni.common.ip_utils import is_private_address
 from ooni.utils import log
@@ -7,6 +8,7 @@ from twisted.python import usage
 
 import ipaddr
 
+import os
 import random
 import re
 import socket
@@ -15,6 +17,13 @@ import time
 import urllib
 
 from contextlib import closing
+
+MAX_SERVER_RETRIES = 10
+"""Maximum number of times to try to start the HTTP server."""
+
+SERVER_RUNNING_AFTER_SECS = 5
+"""Seconds after which the HTTP server is considered to be running."""
+
 
 # Accept ``SECS.DEC IP:PORT PROTO [FLAG...]`` from peer locator helper.
 _max_data_len = 100
@@ -83,8 +92,23 @@ class PeerLocator(tcpt.TCPTest):
 
     usageOptions = UsageOptions
     requiredTestHelpers = {'backend': 'peer_locator_helper'}
+
+    # Do not time out before we are done trying to start the server
+    # (it causes a ``CancelledError`` in ``ooni.tasks.Measurement``).
+    timeout = int(MAX_SERVER_RETRIES * SERVER_RUNNING_AFTER_SECS * 1.25)
     
     def test_peer_locator(self):
+        def communicate(http_server_port, behind_nat):
+            self.address, self.port = self.localOptions['backend'].split(":")
+            self.port = int(self.port)
+            # HTTP server port, protocol and flags.
+            payload = '%s HTTP' % http_server_port
+            payload += ' nat' if behind_nat else ' nonat'
+            d = self.sendPayload(payload)
+            d.addCallback(got_response)
+            d.addErrback(connection_failed)
+            return d
+
         def got_response(response):
             response = response[:_max_data_len]
             log.msg("received response from helper: %s"%response)
@@ -120,48 +144,61 @@ class PeerLocator(tcpt.TCPTest):
             behind_nat = (get_my_public_ip() != local_ip)
 
         #first we spawn a http server
-
         http_server_port = self.localOptions['http_port']
         random_port = (http_server_port == 'random')
-        is_server_running = False
-        for _ in range(10):  #try at most these times
+
+        def start_server_and_communicate(http_server_port, remainingTries):
+            if remainingTries == 0:
+                #fail, do not report a failed port or a port not used by us
+                log.msg("exceeded retries for running an HTTP server")
+                return communicate(0, behind_nat)
+
             if random_port:  #get random port (with 50% probability for port 80)
                 if (random.randint(0,1) == 0):
                     http_server_port =  '80'
                 else:
                     http_server_port = str(random.randint(1025, 65535))
 
+            def handleServerExit(proc_ret, tout):
+                if proc_ret is None:
+                    #process monitoring cancelled, process running, tell helper
+                    return communicate(http_server_port, behind_nat)
+
+                tout.cancel()  #cancel timeout trigger
+
+                if proc_ret == 2 and not random_port:  #the forced port was busy
+                    log.msg("failed to bind to requested port %s" % http_server_port)
+                    retry = False
+                elif proc_ret == 4:  #UPnP not available
+                    log.msg("UPnP is not available, can not map port")
+                    retry = False
+                elif proc_ret == 3 and not random_port:  #issues with UPnP port mapping
+                    log.msg("failed to map port using UPnP, retrying")
+                    retry = True
+                else:
+                    log.msg("unknown error %d from http server, retrying" % proc_ret)
+                    retry = True
+
+                if retry:  #retry with another port
+                    return start_server_and_communicate(http_server_port, remainingTries-1)
+                return communicate(0, behind_nat)  #proceed to query-only mode
+
+            def handleServerRunning(failure):
+                if isinstance(failure.value, defer.CancelledError):
+                    #the server is running (or less probably too slow to start)
+                    return
+                return failure
+
             log.msg("running an http server on port %s"%http_server_port)
-            proc = subprocess.Popen([
-                'python', '-m', 'ooni.utils.simple_http', '--port', http_server_port,
-                '--upnp' if behind_nat else '--noupnp'])
-            for _ in range(5):  #wait for start or crash
-                if proc.poll() is not None:
-                    break
-                time.sleep(1)
-            proc_ret = proc.poll()
-            if proc_ret is None:  #the server is running (or less probably too slow to start)
-                is_server_running = True
-                break
-            elif proc_ret == 2 and not random_port:  #the forced port was busy
-                log.msg("failed to bind to requested port %s" % http_server_port)
-                break
-            elif proc_ret == 3 and not random_port:  #issues with UPnP port mapping
-                log.msg("failed to map port using UPnP")
-            elif proc_ret == 4:  #UPnP not available
-                log.msg("UPnP is not available, can not map port")
-                break
-            #retry with another port
-        else:
-            #fail, do not report a failed port or a port not used by us
-            log.msg("exceeded retries for running an HTTP server")
-                                
-        self.address, self.port = self.localOptions['backend'].split(":")
-        self.port = int(self.port)
-        # HTTP server port, protocol and flags.
-        payload = '%s HTTP' % (http_server_port if is_server_running else 0)
-        payload += ' nat' if behind_nat else ' nonat'
-        d = self.sendPayload(payload)
-        d.addErrback(connection_failed)
-        d.addCallback(got_response)
-        return d
+            proc = utils.getProcessValue(
+                'python', args=['-m', 'ooni.utils.simple_http',
+                                '--port', http_server_port,
+                                '--upnp' if behind_nat else '--noupnp'],
+                env=os.environ)
+            tout = reactor.callLater(  #wait for start or crash
+                SERVER_RUNNING_AFTER_SECS, lambda p: p.cancel(), proc)
+            proc.addErrback(handleServerRunning)
+            proc.addCallback(handleServerExit, tout)
+            return proc
+
+        return start_server_and_communicate(http_server_port, MAX_SERVER_RETRIES)
