@@ -28,6 +28,9 @@ MAX_HTTP_SERVER_RETRIES = 10
 HTTP_SERVER_RUNNING_AFTER_SECS = 5
 """Seconds after which the HTTP server is considered to be running."""
 
+DCDN_REQUEST_TIMEOUT_SECS = 5
+"""Seconds after which the dCDN proxy request is considered to have timed out."""
+
 
 # Accept ``SECS.DEC IP:PORT PROTO [FLAG[=VALUE]...]`` from peer locator helper.
 _max_data_len = 200
@@ -209,7 +212,9 @@ class PeerLocator(tcpt.TCPTest):
             return proc
 
         def dcdn_fetch_url_and_communicate(dcdn_service_port, dcdn_url):
-            def handleResponse(response):
+            def handleResponse(response, tout):
+                tout.cancel()  #cancel timeout trigger
+
                 if response.code != 200:
                     raise DCDNProxyError("unexpected HTTP status from dCDN client proxy: %d" % response.code)
                 finished = defer.Deferred()
@@ -226,7 +231,9 @@ class PeerLocator(tcpt.TCPTest):
             endpoint = TCP4ClientEndpoint(reactor, 'localhost', int(dcdn_service_port))
             agent = ProxyAgent(endpoint)
             d = agent.request('GET', dcdn_url)
-            d.addCallback(handleResponse)
+            tout = reactor.callLater(  #set a controlled timeout
+                DCDN_REQUEST_TIMEOUT_SECS, lambda r: r.cancel(), d)
+            d.addCallback(handleResponse, tout)
             #XXXX TBD: handle errors and retry
             return d
 
