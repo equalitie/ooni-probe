@@ -147,17 +147,6 @@ class PeerLocator(tcpt.TCPTest):
             failure.trap(ConnectionRefusedError)
             log.msg("Connection Refused")
 
-        #identify whether we are behind NAT
-        local_ip = get_my_local_ip()
-        if is_private_address(local_ip):
-            behind_nat = True
-        else:  #still check our visible address (if none, assume NAT)
-            behind_nat = (get_my_public_ip() != local_ip)
-
-        #first we spawn a http server
-        http_server_port = self.localOptions['http_port']
-        random_port = (http_server_port == 'random')
-
         def start_server_and_communicate(http_server_port, remainingTries):
             if remainingTries == 0:
                 #fail, do not report a failed port or a port not used by us
@@ -211,5 +200,16 @@ class PeerLocator(tcpt.TCPTest):
             proc.addErrback(handleServerRunning)
             proc.addCallback(handleServerExit, tout)
             return proc
+
+        #identify whether we are behind NAT
+        local_ip = get_my_local_ip()
+        if is_private_address(local_ip):
+            behind_nat = True
+        else:  #still check our visible address (if none, assume NAT)
+            behind_nat = (get_my_public_ip() != local_ip)
+
+        #first we spawn a http server
+        http_server_port = self.localOptions['http_port']
+        random_port = (http_server_port == 'random')
 
         return start_server_and_communicate(http_server_port, MAX_HTTP_SERVER_RETRIES)
