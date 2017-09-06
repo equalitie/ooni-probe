@@ -141,32 +141,32 @@ class PeerLocator(tcpt.TCPTest):
             failure.trap(ConnectionRefusedError)
             log.msg("Connection Refused")
 
-        def start_server_and_communicate(http_server_port, remainingTries):
+        def http_start_server_and_communicate(http_service_port, remainingTries):
             if remainingTries == 0:
                 #fail, do not report a failed port or a port not used by us
                 log.msg("exceeded retries for running an HTTP server")
                 return communicate(0, behind_nat)
 
-            if random_port:  #get random port (with 50% probability for port 80)
+            if http_random_port:  #get random port (with 50% probability for port 80)
                 if (random.randint(0,1) == 0):
-                    http_server_port =  '80'
+                    http_service_port =  '80'
                 else:
-                    http_server_port = str(random.randint(1025, 65535))
+                    http_service_port = str(random.randint(1025, 65535))
 
             def handleServerExit(proc_ret, tout):
                 if proc_ret is None:
                     #process monitoring cancelled, process running, tell helper
-                    return communicate(http_server_port, behind_nat)
+                    return communicate(http_service_port, behind_nat)
 
                 tout.cancel()  #cancel timeout trigger
 
-                if proc_ret == 2 and not random_port:  #the forced port was busy
-                    log.msg("failed to bind to requested port %s" % http_server_port)
+                if proc_ret == 2 and not http_random_port:  #the forced port was busy
+                    log.msg("failed to bind to requested port %s" % http_service_port)
                     retry = False
                 elif proc_ret == 4:  #UPnP not available
                     log.msg("UPnP is not available, can not map port")
                     retry = False
-                elif proc_ret == 3 and not random_port:  #issues with UPnP port mapping
+                elif proc_ret == 3 and not http_random_port:  #issues with UPnP port mapping
                     log.msg("failed to map port using UPnP, retrying")
                     retry = True
                 else:
@@ -174,7 +174,7 @@ class PeerLocator(tcpt.TCPTest):
                     retry = True
 
                 if retry:  #retry with another port
-                    return start_server_and_communicate(http_server_port, remainingTries-1)
+                    return http_start_server_and_communicate(http_service_port, remainingTries-1)
                 return communicate(0, behind_nat)  #proceed to query-only mode
 
             def handleServerRunning(failure):
@@ -183,10 +183,10 @@ class PeerLocator(tcpt.TCPTest):
                     return
                 return failure
 
-            log.msg("running an http server on port %s"%http_server_port)
+            log.msg("running an http server on port %s"%http_service_port)
             proc = utils.getProcessValue(
                 'python', args=['-m', 'ooni.utils.simple_http',
-                                '--port', http_server_port,
+                                '--port', http_service_port,
                                 '--upnp' if behind_nat else '--noupnp'],
                 env=os.environ)
             tout = reactor.callLater(  #wait for start or crash
@@ -209,7 +209,7 @@ class PeerLocator(tcpt.TCPTest):
             behind_nat = (get_my_public_ip() != local_ip)
 
         #first we spawn a http server
-        http_server_port = self.localOptions['http_port']
-        random_port = (http_server_port == 'random')
+        http_service_port = self.localOptions['http_port']
+        http_random_port = (http_service_port == 'random')
 
-        return start_server_and_communicate(http_server_port, MAX_HTTP_SERVER_RETRIES)
+        return http_start_server_and_communicate(http_service_port, MAX_HTTP_SERVER_RETRIES)
