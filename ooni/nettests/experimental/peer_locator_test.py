@@ -4,7 +4,7 @@ from twisted.internet.error import ConnectionRefusedError
 from twisted.web.client import ProxyAgent
 
 from ooni.common.ip_utils import is_private_address
-from ooni.utils import log
+from ooni.utils import log, net
 from ooni.templates import tcpt
 
 from twisted.python import usage
@@ -212,7 +212,12 @@ class PeerLocator(tcpt.TCPTest):
             def handleResponse(response):
                 if response.code != 200:
                     raise DCDNProxyError("unexpected HTTP status from dCDN client proxy: %d" % response.code)
-                #XXXX TBD: retrieve body
+                finished = defer.Deferred()
+                response.deliverBody(net.BodyReceiver(finished))
+                finished.addCallback(handleBody)
+                return finished
+
+            def handleBody(data):
                 #report the service port and URL to the peer locator
                 return communicate(dcdn_service_port, behind_nat, url=urllib.quote(dcdn_url))
 
