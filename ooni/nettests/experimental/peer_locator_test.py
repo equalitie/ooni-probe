@@ -15,6 +15,7 @@ import socket
 import subprocess #running http server
 import time
 import urllib
+import uuid
 
 from contextlib import closing
 
@@ -66,7 +67,7 @@ def get_my_public_ip():
     return None  # no valid address found
 
 
-_allowed_protocols = {'http': 'HTTP'}
+_allowed_protocols = {'http': 'HTTP', 'dcdn': 'DCDN'}
 
 class UsageOptions(usage.Options):
     optParameters = [['backend', 'b', '127.0.0.1:57007',
@@ -76,7 +77,11 @@ class UsageOptions(usage.Options):
                      ['protocol', 'P', None,
                       'the protocol to report and locate peers for: ' + ', '.join(_allowed_protocols)],
                      ['http_port', 't', '80',
-                      'the port number where the http server is running on ']
+                      'the port number where the http server is running on '],
+                     ['dcdn_port', 't', '8006',
+                      'the port number where the dcdn server is running on '],
+                     ['dcdn_url', 'u', 'http://127.0.0.1:57010/u2p/',
+                      'the prefix used to generate unique URLs to fetch via dCDN']
     
                     ]
 
@@ -214,3 +219,12 @@ class PeerLocator(tcpt.TCPTest):
             http_random_port = (http_service_port == 'random')
 
             return http_start_server_and_communicate(http_service_port, MAX_HTTP_SERVER_RETRIES)
+
+        if service_proto == 'DCDN':
+            dcdn_service_port = self.localOptions['dcdn_port']
+            #generate a new unique URL
+            dcdn_url = self.localOptions['dcdn_url'] + bytes(uuid.uuid4())
+            #fetch the URL using the client (and supposedly the injector); retry
+            #XXXX TBD
+            #report the service port and URL to the peer locator
+            return communicate(dcdn_service_port, behind_nat)
