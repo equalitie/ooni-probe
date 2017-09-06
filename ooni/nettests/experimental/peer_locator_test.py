@@ -1,5 +1,8 @@
 from twisted.internet import defer, reactor, utils
+from twisted.internet.endpoints import TCP4ClientEndpoint
 from twisted.internet.error import ConnectionRefusedError
+from twisted.web.client import ProxyAgent
+
 from ooni.common.ip_utils import is_private_address
 from ooni.utils import log
 from ooni.templates import tcpt
@@ -84,6 +87,9 @@ class UsageOptions(usage.Options):
                       'the prefix used to generate unique URLs to fetch via dCDN']
     
                     ]
+
+class DCDNProxyError(Exception):
+    pass
 
 
 class PeerLocator(tcpt.TCPTest):
@@ -202,6 +208,23 @@ class PeerLocator(tcpt.TCPTest):
             proc.addCallback(handleServerExit, tout)
             return proc
 
+        def dcdn_fetch_url_and_communicate(dcdn_service_port, dcdn_url):
+            def handleResponse(response):
+                if response.code != 200:
+                    raise DCDNProxyError("unexpected HTTP status from dCDN client proxy: %d" % response.code)
+                #XXXX TBD: retrieve body
+                #report the service port and URL to the peer locator
+                return communicate(dcdn_service_port, behind_nat, url=urllib.quote(dcdn_url))
+
+            #fetch the URL using the client (and supposedly the injector)
+            log.msg("retrieving URL from local dCDN client proxy: %s" % dcdn_url)
+            endpoint = TCP4ClientEndpoint(reactor, 'localhost', int(dcdn_service_port))
+            agent = ProxyAgent(endpoint)
+            d = agent.request('GET', dcdn_url)
+            d.addCallback(handleResponse)
+            #XXXX TBD: handle errors and retry
+            return d
+
         # Post options does not work in OONI, check by hand.
         try:
             service_proto = _allowed_protocols[self.localOptions['protocol']]
@@ -226,7 +249,5 @@ class PeerLocator(tcpt.TCPTest):
             dcdn_service_port = self.localOptions['dcdn_port']
             #generate a new unique URL
             dcdn_url = self.localOptions['dcdn_url'] + bytes(uuid.uuid4())
-            #fetch the URL using the client (and supposedly the injector); retry
-            #XXXX TBD
-            #report the service port and URL to the peer locator
-            return communicate(dcdn_service_port, behind_nat, url=urllib.quote(dcdn_url))
+
+            return dcdn_fetch_url_and_communicate(dcdn_service_port, dcdn_url)
