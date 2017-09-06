@@ -208,8 +208,9 @@ class PeerLocator(tcpt.TCPTest):
         else:  #still check our visible address (if none, assume NAT)
             behind_nat = (get_my_public_ip() != local_ip)
 
-        #first we spawn a http server
-        http_service_port = self.localOptions['http_port']
-        http_random_port = (http_service_port == 'random')
+        if service_proto == 'HTTP':
+            #first we spawn a http server
+            http_service_port = self.localOptions['http_port']
+            http_random_port = (http_service_port == 'random')
 
-        return http_start_server_and_communicate(http_service_port, MAX_HTTP_SERVER_RETRIES)
+            return http_start_server_and_communicate(http_service_port, MAX_HTTP_SERVER_RETRIES)
