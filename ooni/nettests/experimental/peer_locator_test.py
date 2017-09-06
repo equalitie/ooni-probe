@@ -103,12 +103,6 @@ class PeerLocator(tcpt.TCPTest):
     timeout = int(MAX_HTTP_SERVER_RETRIES * HTTP_SERVER_RUNNING_AFTER_SECS * 1.25)
     
     def test_peer_locator(self):
-        # Post options does not work in OONI, check by hand.
-        try:
-            service_proto = _allowed_protocols[self.localOptions['protocol']]
-        except KeyError as ke:
-            raise usage.UsageError("invalid protocol: %s" % ke.args[0])
-
         def communicate(service_port, behind_nat):
             self.address, self.port = self.localOptions['backend'].split(":")
             self.port = int(self.port)
@@ -200,6 +194,12 @@ class PeerLocator(tcpt.TCPTest):
             proc.addErrback(handleServerRunning)
             proc.addCallback(handleServerExit, tout)
             return proc
+
+        # Post options does not work in OONI, check by hand.
+        try:
+            service_proto = _allowed_protocols[self.localOptions['protocol']]
+        except KeyError as ke:
+            raise usage.UsageError("invalid protocol: %s" % ke.args[0])
 
         #identify whether we are behind NAT
         local_ip = get_my_local_ip()
