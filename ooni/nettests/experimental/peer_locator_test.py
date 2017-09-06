@@ -230,12 +230,12 @@ class PeerLocator(tcpt.TCPTest):
             log.msg("retrieving URL from local dCDN client proxy: %s" % dcdn_url)
             endpoint = TCP4ClientEndpoint(reactor, 'localhost', int(dcdn_service_port))
             agent = ProxyAgent(endpoint)
-            d = agent.request('GET', dcdn_url)
+            req = agent.request('GET', dcdn_url)
             tout = reactor.callLater(  #set a controlled timeout
-                DCDN_REQUEST_TIMEOUT_SECS, lambda r: r.cancel(), d)
-            d.addCallback(handleResponse, tout)
+                DCDN_REQUEST_TIMEOUT_SECS, lambda r: r.cancel(), req)
+            req.addCallback(handleResponse, tout)
             #XXXX TBD: handle errors and retry
-            return d
+            return req
 
         # Post options does not work in OONI, check by hand.
         try:
