@@ -108,12 +108,14 @@ class PeerLocator(tcpt.TCPTest):
     timeout = int(MAX_HTTP_SERVER_RETRIES * HTTP_SERVER_RUNNING_AFTER_SECS * 1.25)
     
     def test_peer_locator(self):
-        def communicate(service_port, behind_nat):
+        def communicate(service_port, behind_nat, **flags):
             self.address, self.port = self.localOptions['backend'].split(":")
             self.port = int(self.port)
             # service port, protocol and flags.
             payload = '%s %s' % (service_port, service_proto)
             payload += ' nat' if behind_nat else ' nonat'
+            for (flagn, flagv) in flags.items():
+                payload += ' %s%s' % (flagn, '' if flagv is None else ('=%s' % flagv))
             d = self.sendPayload(payload)
             d.addCallback(got_response)
             d.addErrback(connection_failed)
@@ -227,4 +229,4 @@ class PeerLocator(tcpt.TCPTest):
             #fetch the URL using the client (and supposedly the injector); retry
             #XXXX TBD
             #report the service port and URL to the peer locator
-            return communicate(dcdn_service_port, behind_nat)
+            return communicate(dcdn_service_port, behind_nat, url=urllib.quote(dcdn_url))
