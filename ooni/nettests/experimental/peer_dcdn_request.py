@@ -20,6 +20,12 @@ class UsageOptions(usage.Options):
     ]
 
 class PeerDCDNRequest(NetTestCase):
+    """dCDN request test
+
+    Downloads a series of URLs already cached by other dCDN clients
+    (previously discovered by peer locator test runs) using the local dCDN
+    client, which is told to use the DHT to reach the other clients.
+    """
     name = "dCDN request test"
     description = "Tries to retrieve URLs cached by peers via dCDN DHT"
     author = 'ivan@equalit.ie'
