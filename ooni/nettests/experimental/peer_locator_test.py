@@ -88,7 +88,7 @@ class UsageOptions(usage.Options):
                       'the protocol to report and locate peers for: ' + ', '.join(_allowed_protocols)],
                      ['http_port', 't', '80',
                       'the port number where the http server is running on '],
-                     ['dcdn_port', 't', '8006',
+                     ['dcdn_port', 'd', '8006',
                       'the port number where the dcdn server is running on '],
                      ['dcdn_url', 'u', 'http://127.0.0.1:57010/u2p/',
                       'the prefix used to generate unique URLs to fetch via dCDN']
