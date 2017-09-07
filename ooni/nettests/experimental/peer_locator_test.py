@@ -22,6 +22,7 @@ import uuid
 
 from contextlib import closing
 
+
 MAX_HTTP_SERVER_RETRIES = 10
 """Maximum number of times to try to start the HTTP server."""
 
