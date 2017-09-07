@@ -28,7 +28,10 @@ MAX_HTTP_SERVER_RETRIES = 10
 HTTP_SERVER_RUNNING_AFTER_SECS = 5
 """Seconds after which the HTTP server is considered to be running."""
 
-DCDN_REQUEST_TIMEOUT_SECS = 5
+MAX_DCDN_REQUEST_RETRIES = 5
+"""Maximum number of times to try the request to the dCDN proxy."""
+
+DCDN_REQUEST_TIMEOUT_SECS = 10
 """Seconds after which the dCDN proxy request is considered to have timed out."""
 
 
@@ -112,9 +115,13 @@ class PeerLocator(tcpt.TCPTest):
     usageOptions = UsageOptions
     requiredTestHelpers = {'backend': 'peer_locator_helper'}
 
-    # Do not time out before we are done trying to start the server
+    # Do not time out before we are done trying to
+    # start the HTTP server or request the URL to the dCDN proxy
     # (it causes a ``CancelledError`` in ``ooni.tasks.Measurement``).
-    timeout = int(MAX_HTTP_SERVER_RETRIES * HTTP_SERVER_RUNNING_AFTER_SECS * 1.25)
+    timeout = max(  #not the best way to compute this
+        int(MAX_HTTP_SERVER_RETRIES * HTTP_SERVER_RUNNING_AFTER_SECS * 1.25),
+        int(MAX_DCDN_REQUEST_RETRIES * DCDN_REQUEST_TIMEOUT_SECS * 1.25)
+    )
     
     def test_peer_locator(self):
         def communicate(service_port, behind_nat, **flags):
