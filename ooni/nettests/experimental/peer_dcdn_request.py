@@ -1,4 +1,3 @@
-import collections
 import time
 import urllib
 
@@ -11,14 +10,8 @@ from twisted.web.http_headers import Headers
 from ooni.nettest import NetTestCase
 from ooni.utils import log, net
 
+from . import peer_common
 
-# Discard peer entries older than this many seconds.
-MAX_PEER_AGE_SECS_NONAT = (7 - 1) * 24 * 60 * 60  # public IP: 6 days, one less than max server age
-MAX_PEER_AGE_SECS_NAT = 2 * 24 * 60 * 60  # behind NAT: 2 days, a guess on frequency of public IP changes
-
-
-# A peer entry with a time stamp, transport address, protocol and a tuple of flags.
-PeerEntry = collections.namedtuple('PeerEntry', 'ts addr proto flags')
 
 class UsageOptions(usage.Options):
     optParameters = [
@@ -40,23 +33,10 @@ class PeerDCDNRequest(NetTestCase):
 
     timeout = 10
 
-    def _parsePeerEntry(self, data):
-        """Parse `data` and return a `PeerEntry`."""
-        splitted = data.split()
-        return PeerEntry(ts=float(splitted[0]),
-                         addr=splitted[1],
-                         proto=splitted[2], flags=tuple(splitted[3:]))
-
     def inputProcessor(self, filename):
         """Iterate over each `PeerEntry` in the peers file."""
-        now = time.time()
-        for l in super(PeerDCDNRequest, self).inputProcessor(filename):
-            peer = self._parsePeerEntry(l)
-            # Only consider entries not older than max peer age
-            # (which depends on whether the peer is behind NAT).
-            max_peer_age = MAX_PEER_AGE_SECS_NONAT if b'nonat' in peer.flags else MAX_PEER_AGE_SECS_NAT
-            if (now - peer.ts) < max_peer_age and peer.proto == 'DCDN':
-                yield peer
+        inproc = super(PeerDCDNRequest, self).inputProcessor(filename)
+        return peer_common.processPeers(inproc, 'DCDN')
 
     def setUp(self):
         peer = self.input
