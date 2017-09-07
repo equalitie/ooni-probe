@@ -1,7 +1,7 @@
 from twisted.internet import defer, reactor, utils
 from twisted.internet.endpoints import TCP4ClientEndpoint
 from twisted.internet.error import ConnectionRefusedError
-from twisted.web.client import ProxyAgent
+from twisted.web.client import ProxyAgent, ResponseNeverReceived
 
 from ooni.common.ip_utils import is_private_address
 from ooni.utils import log, net
@@ -218,7 +218,12 @@ class PeerLocator(tcpt.TCPTest):
             proc.addCallback(handleServerExit, tout)
             return proc
 
-        def dcdn_fetch_url_and_communicate(dcdn_service_port, dcdn_url):
+        def dcdn_fetch_url_and_communicate(dcdn_service_port, dcdn_url, remainingTries):
+            if remainingTries == 0:
+                #fail, do not report a failed URL
+                log.msg("exceeded retries for retrieving URL via dCDN proxy")
+                return communicate(0, behind_nat)  #proceed to query-only mode
+
             def handleResponse(response, tout):
                 tout.cancel()  #cancel timeout trigger
 
@@ -233,6 +238,20 @@ class PeerLocator(tcpt.TCPTest):
                 #report the service port and URL to the peer locator
                 return communicate(dcdn_service_port, behind_nat, url=urllib.quote(dcdn_url))
 
+            def handleError(failure, tout):
+                retry = False
+                if isinstance(failure.value, ResponseNeverReceived):
+                    retry = True  #request timed out, retry
+                elif tout.active():  #handleResponse() may have already cancelled it
+                    tout.cancel()  #cancel timeout trigger
+
+                if isinstance(failure.value, DCDNProxyError):
+                    retry = True  #request returned an unexpected code, retry
+
+                if retry:
+                    return dcdn_fetch_url_and_communicate(dcdn_service_port, dcdn_url, remainingTries-1)
+                return failure  #request failed for other reasons, do not retry
+
             #fetch the URL using the client (and supposedly the injector)
             log.msg("retrieving URL from local dCDN client proxy: %s" % dcdn_url)
             endpoint = TCP4ClientEndpoint(reactor, 'localhost', int(dcdn_service_port))
@@ -241,7 +260,7 @@ class PeerLocator(tcpt.TCPTest):
             tout = reactor.callLater(  #set a controlled timeout
                 DCDN_REQUEST_TIMEOUT_SECS, lambda r: r.cancel(), req)
             req.addCallback(handleResponse, tout)
-            #XXXX TBD: handle errors and retry
+            req.addErrback(handleError, tout)
             return req
 
         # Post options does not work in OONI, check by hand.
@@ -269,4 +288,4 @@ class PeerLocator(tcpt.TCPTest):
             #generate a new unique URL
             dcdn_url = self.localOptions['dcdn_url'] + bytes(uuid.uuid4())
 
-            return dcdn_fetch_url_and_communicate(dcdn_service_port, dcdn_url)
+            return dcdn_fetch_url_and_communicate(dcdn_service_port, dcdn_url, MAX_DCDN_REQUEST_RETRIES)
